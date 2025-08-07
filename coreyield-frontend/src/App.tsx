@@ -1,10 +1,8 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useAccount } from 'wagmi'
 import { Web3Provider } from './providers/Web3Provider'
-import { ThemeProvider, ThemeToggle } from './components/ThemeProvider'
-import { LandingPage } from './components/LandingPage' // Import the NEW Pendle-style landing page
+import { ThemeProvider } from './components/ThemeProvider'
+import { LandingPage } from './components/LandingPage'
 import { MainDashboard } from './components/MainDashboard'
 
 

@@ -67,8 +67,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
     isClaimingYield,
     formatBalance,
     needsApproval,
-    canExecuteAction,
-    setMaxAmount,
+
     handleMintTestTokens,
     handleApprove,
     handleDeposit,
@@ -795,7 +794,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                         <span className="text-xs text-gray-400">Daily Yield</span>
                       </div>
                       <div className="text-lg font-bold text-white">
-                        {((Number(syBalance || 0) / 1e18) * (parseFloat(ASSET_METADATA[selectedAsset].apy) / 100) / 365 * 1.05).toFixed(4)}
+                        {String(((Number(syBalance || 0) / 1e18) * (Number(ASSET_METADATA[selectedAsset].apy) / 100) / 365 * 1.05).toFixed(4))}
                       </div>
                     </div>
                     
@@ -805,7 +804,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                         <span className="text-xs text-gray-400">Monthly Yield</span>
                       </div>
                       <div className="text-lg font-bold text-white">
-                        {((Number(syBalance || 0) / 1e18) * (parseFloat(ASSET_METADATA[selectedAsset].apy) / 100) / 12 * 1.05).toFixed(3)}
+                        {String(((Number(syBalance || 0) / 1e18) * (Number(ASSET_METADATA[selectedAsset].apy) / 100) / 12 * 1.05).toFixed(3))}
                       </div>
                     </div>
                   </div>
@@ -842,7 +841,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                       
                       {/* Yield curve with real data */}
                       <path
-                        d={`M 0 150 Q 100 ${String(150 - (Number(accumulatedYield || 0) / 1e18) * 200)} 200 ${String(140 - (Number(accumulatedYield || 0) / 1e18) * 300)} T 400 ${String(120 - parseFloat(ASSET_METADATA[selectedAsset].apy))}`}
+                        d={`M 0 150 Q 100 ${String(150 - (Number(accumulatedYield || 0) / 1e18) * 200)} 200 ${String(140 - (Number(accumulatedYield || 0) / 1e18) * 300)} T 400 ${String(120 - Number(ASSET_METADATA[selectedAsset].apy))}`}
                         fill="none"
                         stroke="url(#gradient)"
                         strokeWidth="3"
@@ -851,7 +850,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                       
                       {/* Area fill */}
                       <path
-                        d={`M 0 150 Q 100 ${String(150 - (Number(accumulatedYield || 0) / 1e18) * 200)} 200 ${String(140 - (Number(accumulatedYield || 0) / 1e18) * 300)} T 400 ${String(120 - parseFloat(ASSET_METADATA[selectedAsset].apy))} L 400 200 L 0 200 Z`}
+                        d={`M 0 150 Q 100 ${String(150 - (Number(accumulatedYield || 0) / 1e18) * 200)} 200 ${String(140 - (Number(accumulatedYield || 0) / 1e18) * 300)} T 400 ${String(120 - Number(ASSET_METADATA[selectedAsset].apy))} L 400 200 L 0 200 Z`}
                         fill="url(#areaGradient)"
                       />
                       
@@ -862,14 +861,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                       <circle cx="200" cy={String(140 - (Number(accumulatedYield || 0) / 1e18) * 300)} r="4" fill="#3b82f6" className="animate-pulse">
                         <animate attributeName="r" values="3;5;3" dur="2s" begin="0.5s" repeatCount="indefinite" />
                       </circle>
-                      <circle cx="400" cy={String(120 - parseFloat(ASSET_METADATA[selectedAsset].apy))} r="4" fill="#10b981" className="animate-pulse">
+                      <circle cx="400" cy={String(120 - Number(ASSET_METADATA[selectedAsset].apy))} r="4" fill="#10b981" className="animate-pulse">
                         <animate attributeName="r" values="3;5;3" dur="2s" begin="1s" repeatCount="indefinite" />
                       </circle>
                       
                       {/* Labels */}
                       <text x="10" y="165" fill="#9ca3af" fontSize="10">Deposit</text>
                       <text x="185" y={String(155 - (Number(accumulatedYield || 0) / 1e18) * 300)} fill="#9ca3af" fontSize="10">Current</text>
-                      <text x="360" y={String(135 - parseFloat(ASSET_METADATA[selectedAsset].apy))} fill="#9ca3af" fontSize="10">1 Year</text>
+                      <text x="360" y={String(135 - Number(ASSET_METADATA[selectedAsset].apy))} fill="#9ca3af" fontSize="10">1 Year</text>
                     </svg>
                     
                     {/* Corner Stats */}
@@ -881,7 +880,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding })
                     <div className="absolute bottom-2 right-2 text-right">
                       <div className="text-xs text-gray-400">Projected Annual</div>
                       <div className="text-sm font-bold text-purple-400">
-                        {((Number(syBalance || 0) / 1e18) * (parseFloat(ASSET_METADATA[selectedAsset].apy) / 100) * 1.05).toFixed(2)}
+                        {String(((Number(syBalance || 0) / 1e18) * (Number(ASSET_METADATA[selectedAsset].apy) / 100) * 1.05).toFixed(2))}
                       </div>
                     </div>
                   </div>

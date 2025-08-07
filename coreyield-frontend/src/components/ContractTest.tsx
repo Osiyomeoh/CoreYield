@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
-import { useReadContract } from 'wagmi'
-import { CONTRACTS, ASSET_METADATA } from '@contracts/addresses'
-import StandardizedYieldTokenABI from '../abis/StandardizedYieldToken.json'
+import { CONTRACTS } from '@contracts/addresses'
 
 export const ContractTest: React.FC = () => {
   const [testResults, setTestResults] = useState<string[]>([])

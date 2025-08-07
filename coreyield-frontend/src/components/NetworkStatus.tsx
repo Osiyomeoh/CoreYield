@@ -1,6 +1,6 @@
 import React from 'react'
 import { useAccount, useChainId } from 'wagmi'
-import { CONTRACTS } from '@contracts/addresses'
+
 
 export const NetworkStatus: React.FC = () => {
   const chainId = useChainId()
