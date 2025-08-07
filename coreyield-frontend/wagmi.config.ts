@@ -1,0 +1,31 @@
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { Chain } from 'viem'
+
+export const coreTestnet: Chain = {
+  id: 1114,
+  name: 'Core Testnet2',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Core',
+    symbol: 'CORE',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://rpc.test2.btcs.network'],
+    },
+    public: {
+      http: ['https://rpc.test2.btcs.network'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'CoreScan', url: 'https://scan.test2.btcs.network' },
+  },
+  testnet: true,
+} as const
+
+export const config = getDefaultConfig({
+  appName: 'CoreYield Protocol',
+  projectId: process.env.VITE_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
+  chains: [coreTestnet],
+  ssr: false,
+})
