@@ -18,8 +18,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
   const [assetFilter, setAssetFilter] = useState<'all' | 'pt' | 'yt' | 'lp'>('all')
   const [displayMode, setDisplayMode] = useState<'usd' | 'underlying'>('usd')
   const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastAction, setLastAction] = useState<string>('')
+  // Removed unused loading and action states
 
   // Get real protocol stats
   const { data: protocolStats } = useContractRead({
@@ -400,12 +399,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                   <div className="flex items-center space-x-2 mt-1">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="text-gray-400 text-xs sm:text-sm">Updated just now • Core Testnet</span>
-                    {lastAction && (
-                      <div className="flex items-center space-x-1 text-xs text-blue-400 bg-blue-400/10 px-2 py-1 rounded-full ml-2">
-                        <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
-                        <span>{lastAction}</span>
-                      </div>
-                    )}
+                    {/* Removed lastAction display */}
                   </div>
                 </div>
               </div>
@@ -483,7 +477,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                 
                 {/* Asset Yield Carousel */}
                 {totalClaimableYield > 0 && (() => {
-                  const assetsWithYield = Object.entries(ASSET_METADATA).filter(([key, asset]) => {
+                  const assetsWithYield = Object.entries(ASSET_METADATA).filter(([key]) => {
                     const hook = key === 'stCORE' ? stCOREHook : key === 'lstBTC' ? lstBTCHook : dualCOREHook
                     return Number(hook.accumulatedYield || 0) / 1e18 > 0
                   })
@@ -494,7 +488,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                     <div className="mt-3">
                       {/* Carousel Navigation Dots */}
                       <div className="flex justify-center space-x-1 mb-2">
-                        {assetsWithYield.map(([key], index) => (
+                        {assetsWithYield.map(([key]) => (
                           <button
                             key={key}
                             onClick={() => setSelectedAsset(key as any)}
@@ -735,7 +729,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                   {/* Investment Opportunities */}
                   <div className="grid md:grid-cols-3 gap-6 mb-8">
                     {Object.entries(ASSET_METADATA)
-                      .filter(([key, asset]) => {
+                      .filter(([, asset]) => {
                         if (assetFilter === 'all') return true
                         if (assetFilter === 'pt') return asset.symbol.includes('PT')
                         if (assetFilter === 'yt') return asset.symbol.includes('YT')

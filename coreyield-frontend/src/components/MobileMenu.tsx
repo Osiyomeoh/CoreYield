@@ -17,7 +17,6 @@ interface MenuItem {
 }
 
 export const MobileMenu: React.FC<MobileMenuProps> = ({ 
-  isOpen, 
   onClose, 
   onOpenCalculator,
   onOpenAnalytics,

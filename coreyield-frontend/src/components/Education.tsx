@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { ASSET_METADATA } from '../../contracts/addresses'
 
 interface EducationProps {
@@ -35,7 +35,7 @@ export const Education: React.FC<EducationProps> = ({
     timePeriod: 12,
     monthlyContribution: 100
   })
-  const [simulationResults, setSimulationResults] = useState<any>(null)
+  // Removed unused simulationResults state
   const [isAnimating, setIsAnimating] = useState(false)
 
   // Real people storylines
@@ -617,7 +617,7 @@ Always diversify your investments and never invest more than you can afford to l
                     // Handle regular text with potential bold terms
                     else {
                       // Process any remaining ** terms in regular text
-                      const processedLine = line.replace(/\*\*(.*?)\*\*/g, (match, text) => {
+                      const processedLine = line.replace(/\*\*(.*?)\*\*/g, (_, text) => {
                         return `<span class="font-bold text-blue-400">${text}</span>`
                       })
                       

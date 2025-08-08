@@ -31,9 +31,8 @@ function App() {
     setCurrentView('landing')
   }
 
-  const handleShowEducation = (level?: 'beginner' | 'intermediate' | 'advanced') => {
+  const handleShowEducation = () => {
     setCurrentView('education')
-    // You can add logic here to set the initial level if needed
   }
 
   const handleOpenCalculator = () => {
@@ -44,10 +43,7 @@ function App() {
     setShowCalculator(false)
   }
 
-  const handleNavigate = (view: string) => {
-    setCurrentView(view as ViewType)
-    setMobileMenuOpen(false)
-  }
+  // Removed unused handleNavigate function
 
   const handleOpenAnalytics = () => {
     setShowAnalytics(true)
