@@ -24,7 +24,12 @@ contract MockDualCORE is ERC20, Ownable {
         totalLiquidity = 500000 * 10**18;
     }
     
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "Cannot mint to zero address");
+        require(amount > 0, "Amount must be greater than zero");
+        require(coreReserve >= amount / 2, "Insufficient CORE reserve");
+        require(btcReserve >= amount / 20000, "Insufficient BTC reserve");
+        
         _mint(to, amount);
         liquidityProvided[to] += amount;
         lastLPTime[to] = block.timestamp;

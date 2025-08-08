@@ -20,7 +20,10 @@ contract MockLstBTC is ERC20, Ownable {
         lastRateUpdate = block.timestamp;
     }
     
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "Cannot mint to zero address");
+        require(amount > 0, "Amount must be greater than zero");
+        
         _mint(to, amount);
         if (depositTime[to] == 0) {
             depositTime[to] = block.timestamp;

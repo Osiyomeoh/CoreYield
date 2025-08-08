@@ -1,15 +1,27 @@
 import { useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Web3Provider } from './providers/Web3Provider'
-import { ThemeProvider } from './components/ThemeProvider'
+
 import { LandingPage } from './components/LandingPage'
 import { MainDashboard } from './components/MainDashboard'
+import { Education } from './components/Education'
+import { Footer } from './components/Footer'
+import { Calculator } from './components/Calculator'
+import { MobileMenu } from './components/MobileMenu'
+import { Analytics } from './components/Analytics'
+import { InfoBot } from './components/InfoBot'
+import { WhaleAlerts } from './components/WhaleAlerts'
 
 
-type ViewType = 'landing' | 'dashboard'
+type ViewType = 'landing' | 'dashboard' | 'education'
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('landing')
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const [showInfoBot, setShowInfoBot] = useState(false)
+  const [showWhaleAlerts, setShowWhaleAlerts] = useState(false)
 
   const handleLaunchApp = () => {
     setCurrentView('dashboard')
@@ -19,19 +31,101 @@ function App() {
     setCurrentView('landing')
   }
 
-  return (
+  const handleShowEducation = (level?: 'beginner' | 'intermediate' | 'advanced') => {
+    setCurrentView('education')
+    // You can add logic here to set the initial level if needed
+  }
+
+  const handleOpenCalculator = () => {
+    setShowCalculator(true)
+  }
+
+  const handleCloseCalculator = () => {
+    setShowCalculator(false)
+  }
+
+  const handleNavigate = (view: string) => {
+    setCurrentView(view as ViewType)
+    setMobileMenuOpen(false)
+  }
+
+  const handleOpenAnalytics = () => {
+    setShowAnalytics(true)
+    setMobileMenuOpen(false)
+  }
+
+  const handleOpenInfoBot = () => {
+    setShowInfoBot(true)
+    setMobileMenuOpen(false)
+  }
+
+  const handleOpenWhaleAlerts = () => {
+    setShowWhaleAlerts(true)
+    setMobileMenuOpen(false)
+  }
+
+    return (
     <Web3Provider>
-      <ThemeProvider>
-        <div className="min-h-screen">
-          <Toaster position="bottom-right" />
-          
-          {currentView === 'landing' ? (
-            <LandingPage onLaunchApp={handleLaunchApp} />
-          ) : (
-            <MainDashboard onBackToLanding={handleBackToLanding} />
-          )}
-        </div>
-      </ThemeProvider>
+      <div className="min-h-screen flex flex-col">
+        <Toaster position="bottom-right" />
+        
+        {currentView === 'landing' ? (
+          // Landing page - no mobile menu
+          <div className="flex-1">
+            <LandingPage onLaunchApp={handleLaunchApp} onShowEducation={handleShowEducation} />
+          </div>
+        ) : (
+          // Dashboard and other views - with mobile menu
+          <div className="flex-1">
+            {currentView === 'dashboard' && (
+              <MainDashboard 
+                onBackToLanding={handleBackToLanding} 
+                onShowEducation={handleShowEducation}
+                onOpenMobileMenu={() => setMobileMenuOpen(true)}
+              />
+            )}
+            {currentView === 'education' && (
+              <Education 
+                onBackToLanding={handleBackToLanding} 
+                onLaunchApp={handleLaunchApp} 
+                onBackToDashboard={() => setCurrentView('dashboard')}
+                isStandalone={true}
+                onOpenMobileMenu={() => setMobileMenuOpen(true)}
+              />
+            )}
+          </div>
+        )}
+        
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <MobileMenu 
+            isOpen={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            onOpenCalculator={handleOpenCalculator}
+            onOpenAnalytics={handleOpenAnalytics}
+            onOpenInfoBot={handleOpenInfoBot}
+            onOpenWhaleAlerts={handleOpenWhaleAlerts}
+          />
+        )}
+        
+        <Footer variant={currentView} onOpenCalculator={handleOpenCalculator} />
+        
+        {showCalculator && (
+          <Calculator onClose={handleCloseCalculator} />
+        )}
+        
+        {showAnalytics && (
+          <Analytics onClose={() => setShowAnalytics(false)} />
+        )}
+        
+        {showInfoBot && (
+          <InfoBot onClose={() => setShowInfoBot(false)} />
+        )}
+        
+        {showWhaleAlerts && (
+          <WhaleAlerts onClose={() => setShowWhaleAlerts(false)} />
+        )}
+      </div>
     </Web3Provider>
   )
 }

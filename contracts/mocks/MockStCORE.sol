@@ -27,7 +27,11 @@ contract MockStCORE is ERC20, Ownable {
         stakingTime[msg.sender] = block.timestamp;
     }
     
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "Cannot mint to zero address");
+        require(amount > 0, "Amount must be greater than zero");
+        require(rewardPool >= amount, "Insufficient reward pool");
+        
         _mint(to, amount);
         if (lastUpdateTime[to] == 0) {
             lastUpdateTime[to] = block.timestamp;
@@ -61,13 +65,15 @@ contract MockStCORE is ERC20, Ownable {
     
     function getReward() external returns (uint256) {
         uint256 reward = this.earned(msg.sender);
-        if (reward > 0 && rewardPool >= reward) {
-            rewards[msg.sender] = 0;
-            lastUpdateTime[msg.sender] = block.timestamp;
-            rewardPool -= reward;
-            _mint(msg.sender, reward);
-            emit RewardClaimed(msg.sender, reward);
-        }
+        require(reward > 0, "No rewards to claim");
+        require(rewardPool >= reward, "Insufficient reward pool");
+        
+        rewards[msg.sender] = 0;
+        lastUpdateTime[msg.sender] = block.timestamp;
+        rewardPool -= reward;
+        _mint(msg.sender, reward);
+        emit RewardClaimed(msg.sender, reward);
+        
         return reward;
     }
     
