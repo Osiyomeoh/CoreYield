@@ -1,0 +1,28 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="url(#bgGradient)"/>
+  
+  <!-- CY Letters -->
+  <!-- Letter C -->
+  <path d="M11 9 Q9 9 9 11 Q9 13 11 13 L13 13 Q14 13 14 12 Q14 11 13 11 L11 11 Q10 11 10 12 Q10 13 11 13" 
+        fill="white" stroke="white" stroke-width="1"/>
+  
+  <!-- Letter Y -->
+  <path d="M14 9 L15 11 L16 9 L17 11 L18 9 L17 13 L16 12 L15 13 L14 9" 
+        fill="url(#textGradient)" stroke="url(#textGradient)" stroke-width="1"/>
+  
+  <!-- Upward Arrow/Swoosh -->
+  <path d="M12 14 Q14 12 16 14 Q18 16 20 14" 
+        stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg> 

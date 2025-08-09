@@ -1,0 +1,35 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E5E7EB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="url(#bgGradient)"/>
+  
+  <!-- CY Letters - Simplified for small size -->
+  <!-- Letter C -->
+  <rect x="10" y="8" width="8" height="2" rx="1" fill="white"/>
+  <rect x="10" y="12" width="8" height="2" rx="1" fill="white"/>
+  <rect x="10" y="8" width="2" height="6" rx="1" fill="white"/>
+  
+  <!-- Letter Y -->
+  <rect x="20" y="8" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  <rect x="22" y="8" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  <rect x="24" y="8" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  <rect x="21" y="11" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  <rect x="23" y="11" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  <rect x="22" y="14" width="2" height="3" rx="1" fill="url(#textGradient)"/>
+  
+  <!-- Yield Arrow -->
+  <path d="M12 16 L16 13 L20 16" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M16 13 L16 19" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M14 18 L16 19 L18 18" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg> 

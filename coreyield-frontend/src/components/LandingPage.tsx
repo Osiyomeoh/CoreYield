@@ -266,7 +266,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchApp, onShowEdu
           <div className="flex items-center space-x-3 sm:space-x-4">
             <div className="relative group">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 via-blue-500 to-purple-600 rounded-2xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
-                <span className="text-white font-bold text-base sm:text-lg">CY</span>
+                <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-blue-500 to-purple-600 rounded-2xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity duration-300"></div>
               </div>
             </div>

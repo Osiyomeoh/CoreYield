@@ -84,7 +84,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
                   <div className="max-w-md w-full p-8 bg-gray-800 rounded-2xl border border-gray-700 text-center space-y-6 shadow-lg">
                     <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto">
-                      <span className="text-white font-bold text-xl">CY</span>
+                      <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white mb-2">Connect Wallet</h2>
@@ -117,7 +117,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                     <div className="flex items-center space-x-8">
                           <button onClick={onBackToLanding} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-teal-500 rounded-xl flex items-center justify-center">
-                              <span className="text-white font-bold text-sm">CY</span>
+                              <img src="/logo2.svg" alt="CoreYield" className="w-4 h-4" />
                             </div>
                             <span className="text-white font-medium text-lg">CoreYield</span>
                           </button>

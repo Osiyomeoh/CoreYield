@@ -72,7 +72,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'landing', onOpenCalcu
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-3 mb-4 sm:mb-6">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-teal-500 rounded-2xl flex items-center justify-center">
-                <span className="text-white font-bold text-base sm:text-lg">CY</span>
+                <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white">CoreYield</h3>
