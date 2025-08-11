@@ -1,0 +1,91 @@
+{
+  "network": {
+    "name": "coreTestnet",
+    "chainId": 1114,
+    "rpc": "https://rpc.test2.btcs.network",
+    "explorer": "https://scan.test.btcs.network"
+  },
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "timestamp": "2025-08-10T14:40:05.529Z",
+  "deploymentCost": "1.8828433 CORE",
+  "totalGasUsed": "18458653",
+  "contracts": {
+    "mockAssets": {
+      "MockStCORE": "0x415cDc9111c4A57a1E5599716E876bFa5f75B69D",
+      "MockLstBTC": "0x138d153ba2435F3AF3Da30684034Cfb9b1b2f47A",
+      "MockDualCORE": "0x1854dA2464a036517511418ff57218b25eb6976B"
+    },
+    "standardizedYieldTokens": {
+      "SY-stCORE": "0x58Ecee33932D5C1CDe558f028E79C722d0B8ebd9",
+      "SY-lstBTC": "0xe2Fc813E0a3893A6F6E673c31bBB63829AD9fADF",
+      "SY-dualCORE": "0xb9eaf48C9c7F19216A54D0cCADC3709a4CB7f9D6"
+    },
+    "coreProtocol": {
+      "CoreYieldFactory": "0x60d80A4d4040d50384C30856B914688deECfB072",
+      "ChainlinkPriceOracle": "0x0D4E04323cBa3E12DA0d898Ea65327CfD426a469"
+    }
+  },
+  "markets": {
+    "stCORE": {
+      "marketId": "0x58Ecee33932D5C1CDe558f028E79C722d0B8ebd9",
+      "maturity": "6 months",
+      "ptToken": "0x7E05E0ed952A091F441D680876370b8503c27a4d",
+      "ytToken": "0x9073BE9Aa68f371C8397e349A0BaEA940c4961c7",
+      "apy": "8.5%"
+    },
+    "lstBTC": {
+      "marketId": "0xe2Fc813E0a3893A6F6E673c31bBB63829AD9fADF",
+      "maturity": "1 year",
+      "ptToken": "0x42e62Ca9E0E6af9bA746C7b2B0589e0f843dF26a",
+      "ytToken": "0x8C9797fD7c1A8fFAB1e3153dB896ad61403086ee",
+      "apy": "4.2%"
+    },
+    "dualCORE": {
+      "marketId": "0xb9eaf48C9c7F19216A54D0cCADC3709a4CB7f9D6",
+      "maturity": "3 months",
+      "ptToken": "0x36D8e8262422f04781f19F8C93027e36fe264ce6",
+      "ytToken": "0x61fD2ee2B58c2258a054ec6532a14c40A85f666D",
+      "apy": "12.1%"
+    }
+  },
+  "ammPools": {
+    "stCORE": {
+      "active": true,
+      "ptReserves": "450.0",
+      "ytReserves": "450.0",
+      "totalLiquidity": "450.0"
+    },
+    "lstBTC": {
+      "active": true,
+      "ptReserves": "2.5",
+      "ytReserves": "2.5",
+      "totalLiquidity": "2.5"
+    }
+  },
+  "liquidityMining": {
+    "stCORE": {
+      "active": true,
+      "totalStaked": "200.0",
+      "rewardRate": "0.1"
+    },
+    "lstBTC": {
+      "active": true,
+      "totalStaked": "0.0",
+      "rewardRate": "0.05"
+    }
+  },
+  "gasBreakdown": {
+    "mockAssets": "3119218",
+    "syTokens": "6006579",
+    "factory": "4560468",
+    "markets": "4772388",
+    "total": "18458653"
+  },
+  "status": "DEPLOYED_AND_VERIFIED",
+  "nextSteps": [
+    "Frontend integration using deployed contract addresses",
+    "Contract verification on Core Explorer (optional)",
+    "Create demo video showing live functionality",
+    "Submit to buildathon with live testnet deployment"
+  ]
+} 

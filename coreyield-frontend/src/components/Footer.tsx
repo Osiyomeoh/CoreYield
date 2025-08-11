@@ -1,7 +1,7 @@
 import React from 'react'
 
 interface FooterProps {
-  variant?: 'landing' | 'dashboard' | 'education'
+  variant?: 'landing' | 'dashboard' | 'education' | 'social' | 'documentation' | 'mobile'
   onOpenCalculator?: () => void
 }
 

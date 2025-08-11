@@ -11,9 +11,12 @@ import { MobileMenu } from './components/MobileMenu'
 import { Analytics } from './components/Analytics'
 import { InfoBot } from './components/InfoBot'
 import { WhaleAlerts } from './components/WhaleAlerts'
+import { SocialFeatures } from './components/SocialFeatures'
+import { Documentation } from './components/Documentation'
+import { MobileOptimization } from './components/MobileOptimization'
 
 
-type ViewType = 'landing' | 'dashboard' | 'education'
+type ViewType = 'landing' | 'dashboard' | 'education' | 'social' | 'documentation' | 'mobile'
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('landing')
@@ -60,6 +63,21 @@ function App() {
     setMobileMenuOpen(false)
   }
 
+  const handleOpenSocial = () => {
+    setCurrentView('social')
+    setMobileMenuOpen(false)
+  }
+
+  const handleOpenDocumentation = () => {
+    setCurrentView('documentation')
+    setMobileMenuOpen(false)
+  }
+
+  const handleOpenMobile = () => {
+    setCurrentView('mobile')
+    setMobileMenuOpen(false)
+  }
+
     return (
     <Web3Provider>
       <div className="min-h-screen flex flex-col">
@@ -89,6 +107,15 @@ function App() {
                 onOpenMobileMenu={() => setMobileMenuOpen(true)}
               />
             )}
+            {currentView === 'social' && (
+              <SocialFeatures />
+            )}
+            {currentView === 'documentation' && (
+              <Documentation />
+            )}
+            {currentView === 'mobile' && (
+              <MobileOptimization />
+            )}
           </div>
         )}
         
@@ -101,6 +128,9 @@ function App() {
             onOpenAnalytics={handleOpenAnalytics}
             onOpenInfoBot={handleOpenInfoBot}
             onOpenWhaleAlerts={handleOpenWhaleAlerts}
+            onOpenSocial={handleOpenSocial}
+            onOpenDocumentation={handleOpenDocumentation}
+            onOpenMobile={handleOpenMobile}
           />
         )}
         
@@ -111,7 +141,7 @@ function App() {
         )}
         
         {showAnalytics && (
-          <Analytics onClose={() => setShowAnalytics(false)} />
+          <Analytics />
         )}
         
         {showInfoBot && (

@@ -14,6 +14,7 @@ interface DeploymentResult {
     syStCORE: string;
     syLstBTC: string;
     syDualCORE: string;
+    priceOracle: string;
     factory: string;
   };
   markets: {
@@ -153,14 +154,45 @@ async function main(): Promise<DeploymentResult> {
   console.log("🏭 Phase 3: Deploying CoreYield Factory...");
   console.log("-".repeat(40));
 
+  // Deploy Chainlink price oracle with testnet addresses
+  console.log("  ⏳ Deploying ChainlinkPriceOracle...");
+  const ChainlinkPriceOracle = await ethers.getContractFactory("ChainlinkPriceOracle");
+  const priceOracle = await ChainlinkPriceOracle.deploy();
+  await priceOracle.waitForDeployment();
+  const priceOracleReceipt = await ethers.provider.getTransactionReceipt(priceOracle.deploymentTransaction()!.hash);
+  factoryGas += priceOracleReceipt!.gasUsed;
+  console.log("  ✅ ChainlinkPriceOracle deployed:", await priceOracle.getAddress());
+
+  // Configure price feeds for testnet
+  console.log("  ⚙️ Configuring price feeds for testnet...");
+  
+  // Core Testnet2 Chainlink addresses (using Sepolia testnet addresses as reference)
+  const CORE_USD_FEED = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70"; // Sepolia CORE/USD
+  const BTC_USD_FEED = "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43"; // Sepolia BTC/USD
+  const ETH_USD_FEED = "0x694AA1769357215DE4FAC081bf1f309aDC325306"; // Sepolia ETH/USD
+  
+  // Cast to interface to access admin functions
+  const priceOracleInterface = priceOracle as any;
+  
+  // Set price feeds for our mock tokens
+  await priceOracleInterface.setPriceFeed(await mockStCORE.getAddress(), CORE_USD_FEED, 8);
+  await priceOracleInterface.setPriceFeed(await mockLstBTC.getAddress(), BTC_USD_FEED, 8);
+  await priceOracleInterface.setPriceFeed(await mockDualCORE.getAddress(), CORE_USD_FEED, 8);
+  
+  // Set fallback prices for tokens without feeds
+  await priceOracleInterface.setFallbackPrice(await mockStCORE.getAddress(), ethers.parseEther("1")); // 1 CORE = 1 USD
+  await priceOracleInterface.setFallbackPrice(await mockLstBTC.getAddress(), ethers.parseEther("50000")); // 1 BTC = 50,000 USD
+  await priceOracleInterface.setFallbackPrice(await mockDualCORE.getAddress(), ethers.parseEther("1")); // 1 CORE = 1 USD
+  
+  console.log("  ✅ Price feeds configured for testnet");
+
   console.log("  ⏳ Deploying CoreYieldFactory...");
   const CoreYieldFactory = await ethers.getContractFactory("CoreYieldFactory");
-  const factory = await CoreYieldFactory.deploy(deployer.address);
+  const factory = await CoreYieldFactory.deploy();
   await factory.waitForDeployment();
   const factoryReceipt = await ethers.provider.getTransactionReceipt(factory.deploymentTransaction()!.hash);
   factoryGas += factoryReceipt!.gasUsed;
   console.log("  ✅ CoreYieldFactory deployed:", await factory.getAddress());
-  console.log("     Fee recipient:", deployer.address);
   console.log("     Gas used:", factoryReceipt!.gasUsed.toString());
   console.log("");
 
@@ -178,7 +210,9 @@ async function main(): Promise<DeploymentResult> {
     "PT-stCORE-6M",
     "PT-stCORE",
     "YT-stCORE-6M", 
-    "YT-stCORE"
+    "YT-stCORE",
+    ethers.parseEther("100"), // minInvestment: 100 tokens
+    ethers.parseEther("1000000") // maxInvestment: 1M tokens
   );
   const stCOREReceipt = await stCOREMarketTx.wait();
   marketsGas += stCOREReceipt!.gasUsed;
@@ -189,7 +223,7 @@ async function main(): Promise<DeploymentResult> {
       try {
         const parsedLog = factory.interface.parseLog(log);
         if (parsedLog?.name === "MarketCreated") {
-          stCOREMarketId = parsedLog.args.marketId;
+          stCOREMarketId = parsedLog.args.syToken;
           break;
         }
       } catch {
@@ -208,7 +242,9 @@ async function main(): Promise<DeploymentResult> {
     "PT-lstBTC-1Y",
     "PT-lstBTC", 
     "YT-lstBTC-1Y",
-    "YT-lstBTC"
+    "YT-lstBTC",
+    ethers.parseEther("1"), // minInvestment: 1 token
+    ethers.parseEther("100000") // maxInvestment: 100K tokens
   );
   const lstBTCReceipt = await lstBTCMarketTx.wait();
   marketsGas += lstBTCReceipt!.gasUsed;
@@ -219,7 +255,7 @@ async function main(): Promise<DeploymentResult> {
       try {
         const parsedLog = factory.interface.parseLog(log);
         if (parsedLog?.name === "MarketCreated") {
-          lstBTCMarketId = parsedLog.args.marketId;
+          lstBTCMarketId = parsedLog.args.syToken;
           break;
         }
       } catch {
@@ -238,7 +274,9 @@ async function main(): Promise<DeploymentResult> {
     "PT-dualCORE-3M",
     "PT-dualCORE",
     "YT-dualCORE-3M", 
-    "YT-dualCORE"
+    "YT-dualCORE",
+    ethers.parseEther("100"), // minInvestment: 100 tokens
+    ethers.parseEther("1000000") // maxInvestment: 1M tokens
   );
   const dualCOREReceipt = await dualCOREMarketTx.wait();
   marketsGas += dualCOREReceipt!.gasUsed;
@@ -249,7 +287,7 @@ async function main(): Promise<DeploymentResult> {
       try {
         const parsedLog = factory.interface.parseLog(log);
         if (parsedLog?.name === "MarketCreated") {
-          dualCOREMarketId = parsedLog.args.marketId;
+          dualCOREMarketId = parsedLog.args.syToken;
           break;
         }
       } catch {
@@ -285,11 +323,11 @@ async function main(): Promise<DeploymentResult> {
   // console.log("  ✅ Test wrap successful - SY balance:", ethers.formatEther(syBalance));
 
   // Get protocol stats
-  const protocolStats = await factory.getProtocolStats();
+  const marketCount = await factory.getMarketCount();
   console.log("  📈 Protocol Statistics:");
-  console.log("     Total Markets:", protocolStats.totalMarkets.toString());
-  console.log("     Active Markets:", protocolStats.activeMarkets.toString());
-  console.log("     TVL:", ethers.formatEther(protocolStats.totalValueLocked), "tokens");
+  console.log("     Total Markets:", marketCount.toString());
+  console.log("     Active Markets:", marketCount.toString()); // All markets are active initially
+  console.log("     TVL: 0 tokens (no deposits yet)");
 
   // Calculate final costs
   totalGasUsed = mockAssetsGas + syTokensGas + factoryGas + marketsGas;
@@ -317,6 +355,7 @@ async function main(): Promise<DeploymentResult> {
   console.log("    SY-dualCORE:", await syDualCORE.getAddress());
   console.log("  Core Protocol:");
   console.log("    CoreYieldFactory:", await factory.getAddress());
+  console.log("    ChainlinkPriceOracle:", await priceOracle.getAddress());
   console.log("");
   console.log("🏪 CREATED MARKETS:");
   console.log("  stCORE Market (6M):", stCOREMarketId);
@@ -354,6 +393,7 @@ async function main(): Promise<DeploymentResult> {
       syStCORE: await syStCORE.getAddress(),
       syLstBTC: await syLstBTC.getAddress(),
       syDualCORE: await syDualCORE.getAddress(),
+      priceOracle: await priceOracle.getAddress(),
       factory: await factory.getAddress()
     },
     markets: {
@@ -376,8 +416,20 @@ async function main(): Promise<DeploymentResult> {
     fs.mkdirSync(deploymentsDir, { recursive: true });
   }
   
+  // Convert BigInt values to strings for JSON serialization
+  const deploymentResultForFile = {
+    ...deploymentResult,
+    gasUsed: {
+      total: deploymentResult.gasUsed.total.toString(),
+      mockAssets: deploymentResult.gasUsed.mockAssets.toString(),
+      syTokens: deploymentResult.gasUsed.syTokens.toString(),
+      factory: deploymentResult.gasUsed.factory.toString(),
+      markets: deploymentResult.gasUsed.markets.toString()
+    }
+  };
+  
   const deploymentFile = path.join(deploymentsDir, `coreyield-${network.chainId}-${Date.now()}.json`);
-  fs.writeFileSync(deploymentFile, JSON.stringify(deploymentResult, null, 2));
+  fs.writeFileSync(deploymentFile, JSON.stringify(deploymentResultForFile, null, 2));
   console.log("💾 Deployment info saved to:", deploymentFile);
 
   return deploymentResult;

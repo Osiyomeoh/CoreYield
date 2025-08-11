@@ -1,269 +1,306 @@
-// contracts/core/CoreYieldFactory.sol (Fixed - All Imports Working)
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/ICoreYieldFactory.sol";
+import "../tokens/CorePrincipalToken.sol";
+import "../tokens/CoreYieldToken.sol";
 
-// Forward declarations to avoid circular imports
-interface IERC20Token {
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function transfer(address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-}
-
-interface IStandardizedYieldToken is IERC20Token {
-    function wrap(uint256 amount) external returns (uint256);
-    function unwrap(uint256 syAmount) external returns (uint256);
-    function getAccumulatedYield(address user) external view returns (uint256);
-}
-
-interface ICorePrincipalToken is IERC20Token {
-    function mint(address to, uint256 amount) external;
-    function burn(address from, uint256 amount) external;
-    function isExpired() external view returns (bool);
-}
-
-interface ICoreYieldTokenContract is IERC20Token {
-    function mint(address to, uint256 amount) external;
-    function burn(address from, uint256 amount) external;
-    function claimYield() external returns (uint256);
-    function claimableYield(address user) external view returns (uint256);
-}
 
 contract CoreYieldFactory is Ownable, ReentrancyGuard, ICoreYieldFactory {
-    
-    // Use Market struct from interface - no duplicate declaration
-    struct UserPosition {
-        uint256 syAmount;
-        uint256 ptAmount;
-        uint256 ytAmount;
-        uint256 lastInteraction;
-    }
-    
-    mapping(bytes32 => Market) public markets;
-    mapping(bytes32 => mapping(address => UserPosition)) public userPositions;
-    mapping(address => bytes32[]) public userMarkets;
-    
-    bytes32[] public allMarkets;
-    uint256 public constant MIN_MATURITY = 1 days;
-    uint256 public constant MAX_MATURITY = 365 days;
-    uint256 public protocolFeeRate = 50; // 0.5%
-    address public feeRecipient;
-    
-    event MarketCreated(
-        bytes32 indexed marketId,
-        address indexed syToken,
-        address indexed creator,
-        address ptToken,
-        address ytToken,
-        uint256 maturity
-    );
-    
-    event TokensSplit(
-        bytes32 indexed marketId,
-        address indexed user,
-        uint256 syAmount,
-        uint256 ptAmount,
-        uint256 ytAmount
-    );
-    
-    event TokensRedeemed(
-        bytes32 indexed marketId,
-        address indexed user,
-        uint256 amount,
-        bool isMatured
-    );
-    
-    event YieldClaimed(
-        bytes32 indexed marketId,
-        address indexed user,
-        uint256 yieldAmount
-    );
+    using SafeERC20 for IERC20;
 
-    constructor(address _feeRecipient) Ownable(msg.sender) {
-        require(_feeRecipient != address(0), "Invalid fee recipient");
-        feeRecipient = _feeRecipient;
-    }
+    // Market storage
+    mapping(address => Market) public markets;
+    address[] public allMarkets;
+    mapping(address => address[]) public userMarkets;
+    mapping(address => mapping(address => UserPosition)) public userPositions;
     
+    // Market creation fee (0.1%)
+    uint256 public constant MARKET_CREATION_FEE = 1000; // 0.1% = 1000/1000000
+    uint256 public constant FEE_DENOMINATOR = 1000000;
+    
+
+
+    constructor() Ownable(msg.sender) {}
+
+    // Core market creation
     function createMarket(
         address syToken,
         uint256 maturityDuration,
         string memory ptName,
         string memory ptSymbol,
         string memory ytName,
-        string memory ytSymbol
-    ) external override returns (bytes32 marketId) {
+        string memory ytSymbol,
+        uint256 _minInvestment,
+        uint256 _maxInvestment
+    ) external returns (address ptToken, address ytToken) {
         require(syToken != address(0), "Invalid SY token");
-        require(maturityDuration >= MIN_MATURITY && maturityDuration <= MAX_MATURITY, "Invalid maturity");
-        require(bytes(ptName).length > 0 && bytes(ytName).length > 0, "Invalid token names");
+        require(maturityDuration >= 1 days && maturityDuration <= 365 days, "Invalid duration");
+        require(_minInvestment > 0, "Invalid min investment");
+        require(_maxInvestment > _minInvestment, "Invalid max investment");
         
+        // Check if market already exists
+        require(!markets[syToken].active, "Market exists");
+        
+        // Create market
         uint256 maturity = block.timestamp + maturityDuration;
-        marketId = keccak256(abi.encodePacked(syToken, maturity, block.timestamp, msg.sender));
-        require(markets[marketId].syToken == address(0), "Market exists");
-        
-        // Deploy PT and YT contracts using CREATE2 for deterministic addresses
-        bytes32 salt = keccak256(abi.encodePacked(marketId, "PT"));
-        address ptTokenAddress = _deployPTContract(ptName, ptSymbol, syToken, maturity, salt);
-        
-        bytes32 ytSalt = keccak256(abi.encodePacked(marketId, "YT"));
-        address ytTokenAddress = _deployYTContract(ytName, ytSymbol, syToken, maturity, ytSalt);
-        
-        require(ptTokenAddress != address(0), "PT deployment failed");
-        require(ytTokenAddress != address(0), "YT deployment failed");
-        
-        markets[marketId] = Market({
+        markets[syToken] = Market({
+            active: true,
             syToken: syToken,
-            ptToken: ptTokenAddress,
-            ytToken: ytTokenAddress,
+            ptToken: address(0),
+            ytToken: address(0),
             maturity: maturity,
             totalSYDeposited: 0,
-            active: true,
+            totalYieldDistributed: 0,
+            minInvestment: _minInvestment,
+            maxInvestment: _maxInvestment,
             createdAt: block.timestamp
         });
         
-        allMarkets.push(marketId);
-        emit MarketCreated(marketId, syToken, msg.sender, ptTokenAddress, ytTokenAddress, maturity);
-        return marketId;
+        // Deploy PT token
+        CorePrincipalToken pt = new CorePrincipalToken(
+            ptName,
+            ptSymbol,
+            syToken,
+            maturity
+        );
+        
+        // Deploy YT token
+        CoreYieldToken yt = new CoreYieldToken(
+            ytName,
+            ytSymbol,
+            syToken,
+            maturity
+        );
+        
+        // Transfer ownership of PT and YT tokens to this factory
+        pt.transferOwnership(address(this));
+        yt.transferOwnership(address(this));
+        
+        // Update market with token addresses
+        markets[syToken].ptToken = address(pt);
+        markets[syToken].ytToken = address(yt);
+        
+        // Add to all markets list
+        allMarkets.push(syToken);
+        
+        emit MarketCreated(syToken, address(pt), address(yt), maturity);
+        
+        return (address(pt), address(yt));
     }
-    
-    function splitTokens(bytes32 marketId, uint256 syAmount) external override nonReentrant {
-        Market storage market = markets[marketId];
-        require(market.active, "Market not active");
-        require(block.timestamp < market.maturity, "Market expired");
+
+    // Core token splitting
+    function splitTokens(
+        address syToken, 
+        uint256 syAmount,
+        uint256 minPTAmount,
+        uint256 minYTAmount
+    ) external nonReentrant {
         require(syAmount > 0, "Invalid amount");
+        require(markets[syToken].active, "Market inactive");
+        require(block.timestamp < markets[syToken].maturity, "Market expired");
         
-        IStandardizedYieldToken sy = IStandardizedYieldToken(market.syToken);
-        ICorePrincipalToken pt = ICorePrincipalToken(market.ptToken);
-        ICoreYieldTokenContract yt = ICoreYieldTokenContract(market.ytToken);
-        
-        // Calculate protocol fee
-        uint256 fee = (syAmount * protocolFeeRate) / 10000;
-        uint256 netAmount = syAmount - fee;
+        Market storage market = markets[syToken];
         
         // Transfer SY tokens from user
-        require(sy.transferFrom(msg.sender, address(this), syAmount), "SY transfer failed");
+        IERC20(syToken).safeTransferFrom(msg.sender, address(this), syAmount);
         
-        // Transfer fee if applicable
-        if (fee > 0) {
-            require(sy.transfer(feeRecipient, fee), "Fee transfer failed");
-        }
+        // Calculate PT and YT amounts (1:1 ratio for now)
+        uint256 ptAmount = syAmount;
+        uint256 ytAmount = syAmount;
+        
+        require(ptAmount >= minPTAmount, "Insufficient PT amount");
+        require(ytAmount >= minYTAmount, "Insufficient YT amount");
         
         // Mint PT and YT tokens
-        pt.mint(msg.sender, netAmount);
-        yt.mint(msg.sender, netAmount);
+        CorePrincipalToken pt = CorePrincipalToken(market.ptToken);
+        CoreYieldToken yt = CoreYieldToken(market.ytToken);
         
-        // Update tracking
-        market.totalSYDeposited += netAmount;
-        UserPosition storage userPos = userPositions[marketId][msg.sender];
-        userPos.syAmount += netAmount;
-        userPos.ptAmount += netAmount;
-        userPos.ytAmount += netAmount;
+        pt.mint(msg.sender, ptAmount);
+        yt.mint(msg.sender, ytAmount);
+        
+        // Update user position
+        UserPosition storage userPos = userPositions[syToken][msg.sender];
+        userPos.ptAmount += ptAmount;
+        userPos.ytAmount += ytAmount;
         userPos.lastInteraction = block.timestamp;
         
-        // Add to user markets if first time
-        if (userPos.syAmount == netAmount) {
-            userMarkets[msg.sender].push(marketId);
+        // Initialize lastYieldClaim if this is the first time user gets YT tokens
+        if (userPos.lastYieldClaim == 0) {
+            userPos.lastYieldClaim = block.timestamp;
         }
         
-        emit TokensSplit(marketId, msg.sender, netAmount, netAmount, netAmount);
+        // Add to user markets if not already there
+        if (userMarkets[msg.sender].length == 0 || 
+            userMarkets[msg.sender][userMarkets[msg.sender].length - 1] != syToken) {
+            userMarkets[msg.sender].push(syToken);
+        }
+        
+        // Update market totals
+        market.totalSYDeposited += syAmount;
+        
+        emit TokensSplit(syToken, msg.sender, syAmount, ptAmount, ytAmount, 0);
     }
-    
-    function redeemTokens(bytes32 marketId, uint256 amount) external override nonReentrant {
-        Market storage market = markets[marketId];
-        require(market.active, "Market not active");
+
+    // Core token redemption
+    function redeemTokens(
+        address syToken, 
+        uint256 amount,
+        uint256 minSYAmount
+    ) external nonReentrant {
         require(amount > 0, "Invalid amount");
+        require(markets[syToken].active, "Market inactive");
+        require(block.timestamp >= markets[syToken].maturity, "Market not expired");
         
-        IStandardizedYieldToken sy = IStandardizedYieldToken(market.syToken);
-        ICorePrincipalToken pt = ICorePrincipalToken(market.ptToken);
-        ICoreYieldTokenContract yt = ICoreYieldTokenContract(market.ytToken);
+        Market storage market = markets[syToken];
+        UserPosition storage userPos = userPositions[syToken][msg.sender];
         
-        bool isMatured = block.timestamp >= market.maturity;
+        require(userPos.ptAmount >= amount, "Insufficient PT balance");
+        require(userPos.ytAmount >= amount, "Insufficient YT balance");
         
-        if (isMatured) {
-            require(pt.balanceOf(msg.sender) >= amount, "Insufficient PT");
-            pt.burn(msg.sender, amount);
-        } else {
-            require(pt.balanceOf(msg.sender) >= amount, "Insufficient PT");
-            require(yt.balanceOf(msg.sender) >= amount, "Insufficient YT");
-            pt.burn(msg.sender, amount);
-            yt.burn(msg.sender, amount);
-        }
+        // Burn PT and YT tokens
+        CorePrincipalToken pt = CorePrincipalToken(market.ptToken);
+        CoreYieldToken yt = CoreYieldToken(market.ytToken);
         
-        require(sy.transfer(msg.sender, amount), "SY transfer failed");
+        pt.burn(msg.sender, amount);
+        yt.burn(msg.sender, amount);
         
-        // Update tracking
-        market.totalSYDeposited = market.totalSYDeposited > amount ? market.totalSYDeposited - amount : 0;
-        UserPosition storage userPos = userPositions[marketId][msg.sender];
-        userPos.syAmount = userPos.syAmount > amount ? userPos.syAmount - amount : 0;
-        if (!isMatured) {
-            userPos.ptAmount = userPos.ptAmount > amount ? userPos.ptAmount - amount : 0;
-            userPos.ytAmount = userPos.ytAmount > amount ? userPos.ytAmount - amount : 0;
-        } else {
-            userPos.ptAmount = userPos.ptAmount > amount ? userPos.ptAmount - amount : 0;
-        }
+        // Calculate SY amount to return (1:1 ratio for now)
+        uint256 syAmount = amount;
+        require(syAmount >= minSYAmount, "Insufficient SY amount");
+        
+        // Transfer SY tokens back to user
+        IERC20(syToken).safeTransfer(msg.sender, syAmount);
+        
+        // Update user position
+        userPos.ptAmount -= amount;
+        userPos.ytAmount -= amount;
         userPos.lastInteraction = block.timestamp;
         
-        emit TokensRedeemed(marketId, msg.sender, amount, isMatured);
+        // Update market totals
+        market.totalSYDeposited -= syAmount;
+        
+        emit TokensRedeemed(syToken, msg.sender, amount, amount, syAmount);
     }
-    
-    function claimYield(bytes32 marketId) external override nonReentrant {
-        Market storage market = markets[marketId];
-        require(market.active, "Market not active");
+
+    // Yield claiming
+    function claimYield(address syToken) external nonReentrant {
+        require(markets[syToken].active, "Market inactive");
         
-        ICoreYieldTokenContract yt = ICoreYieldTokenContract(market.ytToken);
-        require(yt.balanceOf(msg.sender) > 0, "No YT tokens");
+        UserPosition storage userPos = userPositions[syToken][msg.sender];
+        require(userPos.ytAmount > 0, "No YT tokens");
         
-        uint256 claimedAmount = yt.claimYield();
+        uint256 claimableYield = getClaimableYield(syToken, msg.sender);
+        require(claimableYield > 0, "No yield to claim");
         
-        if (claimedAmount > 0) {
-            userPositions[marketId][msg.sender].lastInteraction = block.timestamp;
-            emit YieldClaimed(marketId, msg.sender, claimedAmount);
+        // Update user position
+        userPos.totalYieldClaimed += claimableYield;
+        userPos.lastYieldClaim = block.timestamp;
+        
+        // Transfer yield tokens (assuming SY token has yield)
+        IERC20(syToken).safeTransfer(msg.sender, claimableYield);
+        
+        emit YieldClaimed(syToken, msg.sender, claimableYield);
+    }
+
+    // Yield distribution from external sources
+    function distributeYieldFromSource(
+        address syToken,
+        uint256 yieldAmount,
+        address yieldSource
+    ) external {
+        require(markets[syToken].active, "Market inactive");
+        require(yieldAmount > 0, "Invalid yield amount");
+        
+        // Transfer yield tokens from source
+        IERC20(syToken).safeTransferFrom(yieldSource, address(this), yieldAmount);
+        
+        // Update market totals
+        markets[syToken].totalYieldDistributed += yieldAmount;
+        
+        emit YieldDistributed(syToken, yieldAmount, block.timestamp);
+    }
+
+    // Batch yield distribution
+    function batchDistributeYield(
+        address[] memory syTokens,
+        uint256[] memory yieldAmounts,
+        address yieldSource
+    ) external {
+        require(syTokens.length == yieldAmounts.length, "Array length mismatch");
+        
+        for (uint256 i = 0; i < syTokens.length; i++) {
+            if (yieldAmounts[i] > 0) {
+                this.distributeYieldFromSource(syTokens[i], yieldAmounts[i], yieldSource);
+            }
         }
     }
-    
-    // ========== VIEW FUNCTIONS ==========
-    
-    function getMarket(bytes32 marketId) external view override returns (Market memory) {
-        return markets[marketId];
+
+    // Market management
+    function pauseMarket(address syToken) external onlyOwner {
+        require(markets[syToken].syToken != address(0), "Market does not exist");
+        markets[syToken].active = false;
+        emit MarketPaused(syToken, msg.sender);
     }
     
-    function getAllMarkets() external view returns (bytes32[] memory) {
+    function resumeMarket(address syToken) external onlyOwner {
+        require(markets[syToken].syToken != address(0), "Market does not exist");
+        markets[syToken].active = true;
+        emit MarketResumed(syToken, msg.sender);
+    }
+
+    // View functions
+    function getMarket(address syToken) external view returns (Market memory) {
+        return markets[syToken];
+    }
+    
+    function getAllMarkets() external view returns (address[] memory) {
         return allMarkets;
     }
     
-    function getUserMarkets(address user) external view returns (bytes32[] memory) {
+    function getUserMarkets(address user) external view returns (address[] memory) {
         return userMarkets[user];
     }
     
-    function getUserPosition(bytes32 marketId, address user) external view returns (UserPosition memory) {
-        return userPositions[marketId][user];
+    function getUserPosition(address syToken, address user) external view returns (UserPosition memory) {
+        return userPositions[syToken][user];
     }
     
     function getMarketCount() external view returns (uint256) {
         return allMarkets.length;
     }
     
-    function isMarketActive(bytes32 marketId) external view returns (bool) {
-        Market storage market = markets[marketId];
+    function isMarketActive(address syToken) external view returns (bool) {
+        Market storage market = markets[syToken];
         return market.active && block.timestamp < market.maturity;
     }
-    
-    function getMarketAnalytics(bytes32 marketId) external view returns (
+
+    // Analytics functions
+    function getMarketAnalytics(address syToken) external view returns (
         uint256 totalDeposited,
         uint256 daysToMaturity,
         bool isActive,
-        bool isExpired
+        bool isExpired,
+        uint256 totalYieldDistributed,
+        uint256 lastYieldDistribution,
+        uint256 minInvestment,
+        uint256 maxInvestment
     ) {
-        Market storage market = markets[marketId];
-        require(market.syToken != address(0), "Market does not exist");
-        
-        totalDeposited = market.totalSYDeposited;
-        isExpired = block.timestamp >= market.maturity;
-        daysToMaturity = isExpired ? 0 : (market.maturity - block.timestamp) / 1 days;
-        isActive = market.active && !isExpired;
+        Market storage market = markets[syToken];
+        return (
+            market.totalSYDeposited,
+            market.maturity > block.timestamp ? (market.maturity - block.timestamp) / 1 days : 0,
+            market.active,
+            block.timestamp >= market.maturity,
+            market.totalYieldDistributed,
+            market.createdAt,
+            market.minInvestment,
+            market.maxInvestment
+        );
     }
     
     function getUserAnalytics(address user) external view returns (
@@ -271,290 +308,100 @@ contract CoreYieldFactory is Ownable, ReentrancyGuard, ICoreYieldFactory {
         uint256 activePTBalance,
         uint256 activeYTBalance,
         uint256 totalSYInvested,
-        uint256 lastActivityTime
+        uint256 lastActivityTime,
+        uint256 totalYieldClaimed
     ) {
-        bytes32[] memory userMarketsList = userMarkets[user];
-        totalMarkets = userMarketsList.length;
+        uint256 totalPT = 0;
+        uint256 totalYT = 0;
+        uint256 totalSY = 0;
+        uint256 lastActivity = 0;
+        uint256 totalYield = 0;
         
-        for (uint256 i = 0; i < userMarketsList.length; i++) {
-            UserPosition memory pos = userPositions[userMarketsList[i]][user];
-            Market storage market = markets[userMarketsList[i]];
+        for (uint256 i = 0; i < userMarkets[user].length; i++) {
+            address syToken = userMarkets[user][i];
+            UserPosition storage pos = userPositions[syToken][user];
             
-            if (market.active && block.timestamp < market.maturity) {
-                activePTBalance += pos.ptAmount;
-                activeYTBalance += pos.ytAmount;
+            totalPT += pos.ptAmount;
+            totalYT += pos.ytAmount;
+            totalSY += pos.syAmount;
+            if (pos.lastInteraction > lastActivity) {
+                lastActivity = pos.lastInteraction;
             }
-            
-            totalSYInvested += pos.syAmount;
-            
-            if (pos.lastInteraction > lastActivityTime) {
-                lastActivityTime = pos.lastInteraction;
-            }
+            totalYield += pos.totalYieldClaimed;
         }
-    }
-    
-    function getClaimableYield(bytes32 marketId, address user) external view returns (uint256) {
-        Market storage market = markets[marketId];
-        if (!market.active) return 0;
         
-        try ICoreYieldTokenContract(market.ytToken).claimableYield(user) returns (uint256 claimable) {
-            return claimable;
-        } catch {
-            return 0;
-        }
-    }
-    
-    // ========== INTERNAL DEPLOYMENT FUNCTIONS ==========
-    
-    function _deployPTContract(
-        string memory name,
-        string memory symbol,
-        address syToken,
-        uint256 maturity,
-        bytes32 salt
-    ) internal returns (address) {
-        // Deploy using inline bytecode to avoid import conflicts
-        bytes memory bytecode = abi.encodePacked(
-            type(SimplePTToken).creationCode,
-            abi.encode(name, symbol, syToken, maturity)
-        );
-        
-        address deployed;
-        assembly {
-            deployed := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
-        }
-        return deployed;
-    }
-    
-    function _deployYTContract(
-        string memory name,
-        string memory symbol,
-        address syToken,
-        uint256 maturity,
-        bytes32 salt
-    ) internal returns (address) {
-        bytes memory bytecode = abi.encodePacked(
-            type(SimpleYTToken).creationCode,
-            abi.encode(name, symbol, syToken, maturity)
-        );
-        
-        address deployed;
-        assembly {
-            deployed := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
-        }
-        return deployed;
-    }
-    
-    // ========== ADMIN FUNCTIONS ==========
-    
-    function setProtocolFeeRate(uint256 newFeeRate) external onlyOwner {
-        require(newFeeRate <= 1000, "Fee too high"); // Max 10%
-        protocolFeeRate = newFeeRate;
-    }
-    
-    function setFeeRecipient(address newFeeRecipient) external onlyOwner {
-        require(newFeeRecipient != address(0), "Invalid address");
-        feeRecipient = newFeeRecipient;
-    }
-    
-    function emergencyPause(bytes32 marketId) external onlyOwner {
-        require(markets[marketId].syToken != address(0), "Market does not exist");
-        markets[marketId].active = false;
-    }
-    
-    function reactivateMarket(bytes32 marketId) external onlyOwner {
-        require(markets[marketId].syToken != address(0), "Market does not exist");
-        require(block.timestamp < markets[marketId].maturity, "Market expired");
-        markets[marketId].active = true;
-    }
-    
-    // ========== TESTING HELPERS ==========
-    
-    function createTestMarket(address syToken, uint256 durationInDays) external returns (bytes32) {
-        require(durationInDays >= 1 && durationInDays <= 365, "Invalid duration");
-        
-        string memory suffix = _toString(durationInDays);
-        return this.createMarket(
-            syToken,
-            durationInDays * 1 days,
-            string(abi.encodePacked("PT-", suffix, "D")),
-            string(abi.encodePacked("PT", suffix)),
-            string(abi.encodePacked("YT-", suffix, "D")),
-            string(abi.encodePacked("YT", suffix))
+        return (
+            userMarkets[user].length,
+            totalPT,
+            totalYT,
+            totalSY,
+            lastActivity,
+            totalYield
         );
     }
     
+    function getClaimableYield(address syToken, address user) public view returns (uint256) {
+        UserPosition storage userPos = userPositions[syToken][user];
+        if (userPos.ytAmount == 0) return 0;
+        
+        // Handle case where lastYieldClaim is not initialized (first time user has YT tokens)
+        uint256 timeSinceLastClaim;
+        if (userPos.lastYieldClaim == 0) {
+            // If first time, calculate from when they first got YT tokens (lastInteraction)
+            timeSinceLastClaim = block.timestamp - userPos.lastInteraction;
+        } else {
+            timeSinceLastClaim = block.timestamp - userPos.lastYieldClaim;
+        }
+        
+        // Simple yield calculation based on time and amount
+        // In production, this would be more sophisticated
+        uint256 yieldRate = 850; // 8.5% APY (from SY token)
+        
+        return (userPos.ytAmount * yieldRate * timeSinceLastClaim) / (365 days * 10000);
+    }
+    
+    function getMarketValue(address syToken, address user) external view returns (uint256) {
+        UserPosition storage userPos = userPositions[syToken][user];
+        return userPos.ptAmount + userPos.ytAmount;
+    }
+
+    // Protocol statistics
     function getProtocolStats() external view returns (
         uint256 totalMarkets,
         uint256 activeMarkets,
-        uint256 totalValueLocked
+        uint256 totalValueLocked,
+        uint256 totalYieldDistributed,
+        uint256 lastGlobalYieldDistribution
     ) {
-        totalMarkets = allMarkets.length;
+        uint256 tvl = 0;
+        uint256 totalYield = 0;
+        uint256 activeCount = 0;
         
         for (uint256 i = 0; i < allMarkets.length; i++) {
-            Market storage market = markets[allMarkets[i]];
+            address syToken = allMarkets[i];
+            Market storage market = markets[syToken];
+            tvl += market.totalSYDeposited;
+            totalYield += market.totalYieldDistributed;
             if (market.active && block.timestamp < market.maturity) {
-                activeMarkets++;
+                activeCount++;
             }
-            totalValueLocked += market.totalSYDeposited;
         }
+        
+        return (allMarkets.length, activeCount, tvl, totalYield, block.timestamp);
     }
-    
-    // Helper function for string conversion
-    function _toString(uint256 value) internal pure returns (string memory) {
-        if (value == 0) return "0";
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
-    }
-}
 
-// ========== SIMPLE TOKEN CONTRACTS FOR DEPLOYMENT ==========
-
-contract SimplePTToken {
-    string public name;
-    string public symbol;
-    address public syToken;
-    uint256 public maturity;
-    address public factory;
-    
-    mapping(address => uint256) private _balances;
-    uint256 private _totalSupply;
-    
-    constructor(string memory _name, string memory _symbol, address _syToken, uint256 _maturity) {
-        name = _name;
-        symbol = _symbol;
-        syToken = _syToken;
-        maturity = _maturity;
-        factory = msg.sender;
-    }
-    
-    function balanceOf(address account) external view returns (uint256) {
-        return _balances[account];
-    }
-    
-    function totalSupply() external view returns (uint256) {
-        return _totalSupply;
-    }
-    
-    function mint(address to, uint256 amount) external {
-        require(msg.sender == factory, "Only factory");
-        _balances[to] += amount;
-        _totalSupply += amount;
-    }
-    
-    function burn(address from, uint256 amount) external {
-        require(msg.sender == factory, "Only factory");
-        require(_balances[from] >= amount, "Insufficient balance");
-        _balances[from] -= amount;
-        _totalSupply -= amount;
-    }
-    
-    function isExpired() external view returns (bool) {
-        return block.timestamp >= maturity;
-    }
-    
-    function transfer(address to, uint256 amount) external returns (bool) {
-        require(_balances[msg.sender] >= amount, "Insufficient balance");
-        _balances[msg.sender] -= amount;
-        _balances[to] += amount;
-        return true;
-    }
-    
-    function approve(address, uint256) external pure returns (bool) {
-        return true;
-    }
-    
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(_balances[from] >= amount, "Insufficient balance");
-        _balances[from] -= amount;
-        _balances[to] += amount;
-        return true;
-    }
-}
-
-contract SimpleYTToken {
-    string public name;
-    string public symbol;
-    address public syToken;
-    uint256 public maturity;
-    address public factory;
-    
-    mapping(address => uint256) private _balances;
-    mapping(address => uint256) public lastClaimTime;
-    mapping(address => uint256) public totalClaimed;
-    uint256 private _totalSupply;
-    
-    constructor(string memory _name, string memory _symbol, address _syToken, uint256 _maturity) {
-        name = _name;
-        symbol = _symbol;
-        syToken = _syToken;
-        maturity = _maturity;
-        factory = msg.sender;
-    }
-    
-    function balanceOf(address account) external view returns (uint256) {
-        return _balances[account];
-    }
-    
-    function totalSupply() external view returns (uint256) {
-        return _totalSupply;
-    }
-    
-    function mint(address to, uint256 amount) external {
-        require(msg.sender == factory, "Only factory");
-        _balances[to] += amount;
-        _totalSupply += amount;
-        lastClaimTime[to] = block.timestamp;
-    }
-    
-    function burn(address from, uint256 amount) external {
-        require(msg.sender == factory, "Only factory");
-        require(_balances[from] >= amount, "Insufficient balance");
-        _balances[from] -= amount;
-        _totalSupply -= amount;
-    }
-    
-    function claimableYield(address user) external view returns (uint256) {
-        if (_balances[user] == 0) return 0;
-        uint256 timeElapsed = block.timestamp - lastClaimTime[user];
-        return (_balances[user] * 850 * timeElapsed) / (365 days * 10000); // 8.5% APY
-    }
-    
-    function claimYield() external returns (uint256) {
-        uint256 claimable = this.claimableYield(msg.sender);
-        if (claimable > 0) {
-            totalClaimed[msg.sender] += claimable;
-            lastClaimTime[msg.sender] = block.timestamp;
+    // Emergency functions
+    function emergencyPause() external onlyOwner {
+        // Pause all markets
+        for (uint256 i = 0; i < allMarkets.length; i++) {
+            markets[allMarkets[i]].active = false;
         }
-        return claimable;
     }
     
-    function transfer(address to, uint256 amount) external returns (bool) {
-        require(_balances[msg.sender] >= amount, "Insufficient balance");
-        _balances[msg.sender] -= amount;
-        _balances[to] += amount;
-        return true;
+    function emergencyResume() external onlyOwner {
+        // Resume all markets
+        for (uint256 i = 0; i < allMarkets.length; i++) {
+            markets[allMarkets[i]].active = true;
+        }
     }
-    
-    function approve(address, uint256) external pure returns (bool) {
-        return true;
-    }
-    
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(_balances[from] >= amount, "Insufficient balance");
-        _balances[from] -= amount;
-        _balances[to] += amount;
-        return true;
-    }
-}
+} 

@@ -1,32 +1,47 @@
 // CoreYield Protocol - Deployed Contract Addresses
-// Network: Core Testnet2 (Chain ID: 1114)
-// Deployment Date: 2025-08-05T10:09:38.384Z
+// Network: Core Testnet (Chain ID: 1114)
+// Deployment Date: 2025-08-11 (Updated with yield claiming fixes)
 
 export const CONTRACTS = {
-  FACTORY: '0x5fB9552177B6FE33ca4e6E55B2B1c9Dfc3BDbfD0',
+  FACTORY: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98',
+  AMM: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98', // Factory also acts as AMM
+  LIQUIDITY_MINING: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98', // Factory also handles LM
   MOCK_ASSETS: {
-    stCORE: '0x14fB00c3C7a9269393782f55E1e3cA61449F6b4E',
-    lstBTC: '0xcFE7106a80cE3621b3e05Ab93ce88fC06624e028',
-    dualCORE: '0x1fc1E64a9bF538a6C3FF92Cb85ffA35AC52d6DCD',
+    stCORE: '0x3D6355e7637fdefBf734c053B28F64848Fd08f7b',
+    lstBTC: '0x04Fdb265D4BEa2649c6eed5EC94c41C5317B88f9',
+    dualCORE: '0x8de905f721A8CB31A5CA9D0DB01dEf1A4df34581',
   },
   SY_TOKENS: {
-    'SY-stCORE': '0x7d33476ae3F000eD60178686d64583FC82CdF3d2',
-    'SY-lstBTC': '0x712D2147699aa2152EC69296f15b5f16bCD84D3B',
-    'SY-dualCORE': '0xAB92A4b44f3b321c68Db3716ce546DC365D46838',
+    'SY-stCORE': '0x0231Ca3b6993353ad4Fba8E4484190252B15c603',
+    'SY-lstBTC': '0x5c44c0ED83Cc1b2B12FA5C268Ec469146d667a85',
+    'SY-dualCORE': '0x4300f010a1Bff1a7019351314049e42690Ab8c44',
   },
   MARKETS: {
-    stCORE: '0x09aed8827c178f65e9b7978c674d15a3dbc6d456ea5f469c692eca3ac94d2e0f',
-    lstBTC: '0xf734c7a32b7c93139b6ba8023d71c93264889923c45c212855e477cbe875ef14',
-    dualCORE: '0x1926beb3b680af2572c9ce72f9da8bcd6d4c71bf96773a5458e7d19c46e5c202',
+    stCORE: {
+      syToken: '0x0231Ca3b6993353ad4Fba8E4484190252B15c603',
+      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+    },
+    lstBTC: {
+      syToken: '0x5c44c0ED83Cc1b2B12FA5C268Ec469146d667a85',
+      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+    },
+    dualCORE: {
+      syToken: '0x4300f010a1Bff1a7019351314049e42690Ab8c44',
+      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+    },
   },
+  PRICE_ORACLE: '0xcD457F5A16D6f6eE2996b8344DB8d55d382229B2',
   DEPLOYER: '0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663',
   CHAIN_ID: 1114,
-  NETWORK: 'coreTestnet2',
+  NETWORK: 'coreTestnet',
 } as const
 
 export const CHAIN_CONFIG = {
   chainId: 1114,
-  name: 'Core Testnet2',
+  name: 'Core Testnet',
   rpcUrl: 'https://rpc.test2.btcs.network',
   explorerUrl: 'https://scan.test2.btcs.network',
 } as const
@@ -56,13 +71,13 @@ export const ASSET_METADATA = {
     maturity: '1Y',
   },
   dualCORE: {
-    name: 'Dual Token CORE',
+    name: 'Dual CORE Strategy',
     symbol: 'dualCORE',
     decimals: 18,
     apy: 12.1,
-    description: 'Dual token yield farming',
+    description: 'Dual CORE yield strategy with higher returns',
     icon: '⚡',
-    color: 'from-purple-500 to-pink-500',
+    color: 'from-purple-500 to-blue-500',
     risk: 'Medium',
     maturity: '3M',
   },

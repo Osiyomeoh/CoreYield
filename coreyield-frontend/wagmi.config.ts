@@ -11,10 +11,23 @@ export const coreTestnet: Chain = {
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.test2.btcs.network'],
+      // Use proxy in development, fallback RPC URLs in production
+      http: import.meta.env.DEV 
+        ? ['/rpc'] 
+        : [
+            'https://rpc.test2.btcs.network',
+            'https://1114.rpc.thirdweb.com',
+            'https://rpc.test.btcs.network'
+          ],
     },
     public: {
-      http: ['https://rpc.test2.btcs.network'],
+      http: import.meta.env.DEV 
+        ? ['/rpc'] 
+        : [
+            'https://rpc.test2.btcs.network',
+            'https://1114.rpc.thirdweb.com', 
+            'https://rpc.test.btcs.network'
+          ],
     },
   },
   blockExplorers: {

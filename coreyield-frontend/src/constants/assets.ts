@@ -29,8 +29,8 @@ export const YIELD_ASSETS: YieldAsset[] = [
     address: CONTRACTS.MOCK_ASSETS.dualCORE as `0x${string}`,
     syAddress: CONTRACTS.SY_TOKENS['SY-dualCORE'] as `0x${string}`,
     apy: 12.1,
-    description: 'Dual token yield farming',
-    color: 'from-purple-500 to-pink-500',
+    description: 'Dual CORE yield strategy with higher returns',
+    color: 'from-purple-500 to-blue-500',
     icon: '⚡',
     risk: 'Medium',
     maturity: '3M'

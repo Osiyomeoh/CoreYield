@@ -7,6 +7,9 @@ interface MobileMenuProps {
   onOpenAnalytics: () => void
   onOpenInfoBot: () => void
   onOpenWhaleAlerts: () => void
+  onOpenSocial: () => void
+  onOpenDocumentation: () => void
+  onOpenMobile: () => void
 }
 
 interface MenuItem {
@@ -21,18 +24,28 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
   onOpenCalculator,
   onOpenAnalytics,
   onOpenInfoBot,
-  onOpenWhaleAlerts
+  onOpenWhaleAlerts,
+  onOpenSocial,
+  onOpenDocumentation,
+  onOpenMobile
 }) => {
   const menuItems: MenuItem[] = [
-    // Tools
-    { id: 'calculator', label: 'Calculator', icon: '🧮', action: onOpenCalculator },
-    { id: 'apy-converter', label: 'Implied APY Converter', icon: '📊', action: onOpenCalculator },
+    // Core Features
     { id: 'analytics', label: 'Analytics', icon: '📈', action: onOpenAnalytics },
-    { id: 'info-bot', label: 'Pendle Info Bot', icon: '🤖', action: onOpenInfoBot },
-    { id: 'whale-alerts', label: 'Pendle Whale Alerts', icon: '🐋', action: onOpenWhaleAlerts },
+    { id: 'social', label: 'Social Features', icon: '💬', action: onOpenSocial },
+    { id: 'documentation', label: 'Documentation', icon: '📚', action: onOpenDocumentation },
+    { id: 'mobile', label: 'Mobile View', icon: '📱', action: onOpenMobile },
     
     // Divider
     { id: 'divider1', label: '', icon: '', action: () => {} },
+    
+    // Tools
+    { id: 'calculator', label: 'Calculator', icon: '🧮', action: onOpenCalculator },
+    { id: 'info-bot', label: 'Info Bot', icon: '🤖', action: onOpenInfoBot },
+    { id: 'whale-alerts', label: 'Whale Alerts', icon: '🐋', action: onOpenWhaleAlerts },
+    
+    // Divider
+    { id: 'divider2', label: '', icon: '', action: () => {} },
     
     // Updates and Legal
     { id: 'latest-update', label: 'Latest Update', icon: '🆕', action: () => window.open('/updates', '_blank') },
@@ -57,22 +70,22 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
         {/* Menu Items */}
         <div className="p-2">
           {menuItems.map((item) => (
-                                    item.id === 'divider1' ? (
-                          <div key={item.id} className="h-px bg-gray-700 my-2"></div>
+            item.id.startsWith('divider') ? (
+              <div key={item.id} className="h-px bg-gray-700 my-2"></div>
             ) : (
-                                        <button
-                            key={item.id}
-                            onClick={() => {
-                              item.action()
-                              onClose()
-                            }}
-                            className="w-full p-3 text-left bg-gray-800 hover:bg-gray-750 rounded-lg border border-gray-700 transition-all duration-200 group mb-1"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <span className="text-base sm:text-lg">{item.icon}</span>
-                              <span className="font-medium text-white text-sm sm:text-base">{item.label}</span>
-                            </div>
-                          </button>
+              <button
+                key={item.id}
+                onClick={() => {
+                  item.action()
+                  onClose()
+                }}
+                className="w-full p-3 text-left bg-gray-800 hover:bg-gray-750 rounded-lg border border-gray-700 transition-all duration-200 group mb-1"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-base sm:text-lg">{item.icon}</span>
+                  <span className="font-medium text-white text-sm sm:text-base">{item.label}</span>
+                </div>
+              </button>
             )
           ))}
         </div>
