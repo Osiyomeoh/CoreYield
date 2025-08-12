@@ -27,7 +27,26 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
   const [showManageDropdown, setShowManageDropdown] = useState(false)
 
   // Transaction history state
-  const { transactions, isLoading: historyLoading, filterTransactions, searchTransactions, getTransactionStats, refreshTransactions, searchRecentYieldClaims } = useTransactionHistory()
+  const { 
+    transactions, 
+    isLoading: historyLoading, 
+    filterTransactions, 
+    searchTransactions, 
+    getTransactionStats, 
+    refreshTransactions, 
+    searchRecentYieldClaims,
+    // Pagination
+    currentPage,
+    setCurrentPage,
+    transactionsPerPage,
+    getPaginatedTransactions,
+    getTotalPages,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+    goToFirstPage,
+    goToLastPage
+  } = useTransactionHistory()
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'deposit' | 'withdraw' | 'split' | 'claim'>('all')
   const [transactionSearch, setTransactionSearch] = useState('')
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
@@ -218,6 +237,21 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
     
     return filtered
   }, [transactions, transactionFilter, transactionSearch, filterTransactions, searchTransactions])
+
+  // Get paginated transactions for current page
+  const paginatedTransactions = useMemo(() => {
+    return getPaginatedTransactions(filteredTransactions)
+  }, [filteredTransactions, currentPage, getPaginatedTransactions])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [transactionFilter, transactionSearch])
+
+  // Get total pages for current filtered results
+  const totalPages = useMemo(() => {
+    return getTotalPages(filteredTransactions)
+  }, [filteredTransactions, getTotalPages])
 
   // Helper functions for transaction display
   const getTransactionIcon = (type: 'deposit' | 'withdraw' | 'split' | 'claim') => {
@@ -1204,6 +1238,28 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                       {/* Portfolio Summary */}
                       <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-2xl p-6">
                         <div className="text-xl font-bold text-blue-300 mb-4">Portfolio Summary</div>
+                        
+                        {/* Yield Relationship Explanation */}
+                        <div className="mb-6 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl">
+                          <div className="text-yellow-400 font-semibold mb-3">🌾 Portfolio Yield Relationship</div>
+                          <div className="text-sm text-yellow-300 space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-green-400">💰</span>
+                              <span><strong>Underlying Assets (stCORE, lstBTC):</strong> Generate yield automatically</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-blue-400">🔒</span>
+                              <span><strong>PT Tokens:</strong> Fixed value, no yield generation</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-purple-400">🎲</span>
+                              <span><strong>YT Tokens:</strong> Right to claim yield from underlying assets</span>
+                            </div>
+                            <div className="text-xs text-yellow-200 mt-2 p-2 bg-yellow-600/20 rounded border border-yellow-500/50">
+                              <strong>Key Insight:</strong> YT tokens don't generate yield - they let you claim the yield that underlying assets are generating
+                            </div>
+                          </div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
                             <div className="text-blue-300 font-medium mb-2">Total PT Tokens</div>
@@ -1216,7 +1272,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                 return `${totalPT.toFixed(4)} PT`
                               })()}
                             </div>
-                            <div className="text-sm text-blue-300 mt-1">Fixed Yield Tokens</div>
+                            <div className="text-sm text-blue-300 mt-1">Fixed Value Tokens</div>
+                            <div className="text-xs text-blue-200 mt-2 p-2 bg-blue-600/20 rounded">
+                              🔒 No yield generation - fixed principal value
+                            </div>
                           </div>
                           
                           <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/20">
@@ -1230,7 +1289,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                 return `${totalYT.toFixed(4)} YT`
                               })()}
                             </div>
-                            <div className="text-sm text-purple-300 mt-1">Variable Yield Tokens</div>
+                            <div className="text-sm text-purple-300 mt-1">Yield Claim Rights</div>
+                            <div className="text-xs text-purple-200 mt-2 p-2 bg-purple-600/20 rounded">
+                              🎲 Claim yield from underlying assets (not yield generators)
+                            </div>
                           </div>
                           
                           <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
@@ -1244,7 +1306,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                 return `${totalClaimable.toFixed(6)} SY`
                               })()}
                             </div>
-                            <div className="text-sm text-green-300 mt-1">Available to Claim</div>
+                            <div className="text-sm text-green-300 mt-1">Generated by Underlying Assets</div>
+                            <div className="text-xs text-green-200 mt-2 p-2 bg-green-600/20 rounded">
+                              🌱 This yield was generated by stCORE/lstBTC, claimable via YT tokens
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1462,12 +1527,25 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                     </div>
                                   </div>
                                   <div className="px-4 py-2 bg-purple-500/20 rounded-full border border-purple-500/30">
-                                    <span className="text-sm text-purple-300 font-semibold">VARIABLE YIELD</span>
+                                    <span className="text-sm text-purple-300 font-semibold">YIELD CLAIM RIGHTS</span>
                                   </div>
                                 </div>
                                 
                                 <div className="text-3xl font-bold text-purple-200 mb-4">
                                   {displayMode === 'usd' ? `$${(realYtBalance * 1.05).toFixed(2)}` : `${realYtBalance.toFixed(4)} YT`}
+                                </div>
+                                
+                                {/* YT Token Explanation */}
+                                <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                                  <div className="text-xs text-purple-300 space-y-1">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-yellow-400">💡</span>
+                                      <span><strong>YT tokens are NOT yield generators</strong></span>
+                                    </div>
+                                    <div className="text-xs text-purple-200">
+                                      They represent the right to claim yield from underlying stCORE tokens
+                                    </div>
+                                  </div>
                                 </div>
 
                                 {realYtBalance > 0 ? (
@@ -1481,13 +1559,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                         </span>
                                       </div>
                                       <div className="text-xs text-green-300">
-                                        Real-time accumulation at 8.5% APY
+                                        Yield generated by underlying stCORE at 8.5% APY
                                       </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                       <div className="bg-purple-500/10 p-3 rounded-xl border border-purple-500/20">
-                                        <div className="text-purple-300 font-medium">Variable APY</div>
+                                        <div className="text-purple-300 font-medium">Underlying Asset APY</div>
                                         <div className="text-white font-bold">8.5%</div>
                                       </div>
                                       <div className="bg-purple-500/10 p-3 rounded-xl border border-purple-500/20">
@@ -1785,6 +1863,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                           <span className="text-sm text-white">{formatBalance(assetBalance as bigint)} {ASSET_METADATA[selectedAsset].symbol}</span>
                         </div>
                         
+                        {/* Yield Generation Indicator */}
+                        <div className="p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                          <div className="text-xs text-green-400 flex items-center">
+                            <span className="mr-2">🌱</span>
+                            <span>Generating yield automatically over time</span>
+                          </div>
+                        </div>
+                        
                         <div className="space-y-3">
                           {/* Approval Status Display */}
                           <div className="p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
@@ -1873,45 +1959,90 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
 
                   <button
                     onClick={() => {
-                      // Check if we need SY token approval for splitting
-                      if (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n) {
-                        // User has SY tokens, need to approve SY tokens for factory
-                        currentHook.approveSYTokens(amount)
-                      } else {
-                        // User needs asset approval for wrapping
-                        currentHook.approveAsset(amount)
-                      }
+                      // 🎯 FIXED: Always approve asset for wrapping operations
+                      // Even if user has SY tokens, they still need asset approval to wrap more
+                      currentHook.approveAsset(amount)
                     }}
                     disabled={!amount || isApproving}
                     className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors"
                   >
                     {isApproving ? 'Approving...' : 
-                      (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n) 
-                        ? `Approve SY-${ASSET_METADATA[selectedAsset].symbol} for Splitting`
-                        : `Approve ${ASSET_METADATA[selectedAsset].symbol} for Wrapping`
+                      `Approve ${ASSET_METADATA[selectedAsset].symbol} for Wrapping`
                     }
                   </button>
                   </>
                 ) : (
-                  <div>
-                  <button
-                    onClick={() => {
-                      // If user has SY tokens, split directly. Otherwise, wrap then split
-                      if (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n) {
-                        currentHook.splitTokens(amount)
-                      } else {
-                        currentHook.handleDepositAndSplit(amount)
-                      }
-                    }}
-                    disabled={!amount || isDepositing}
-                    className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors"
-                  >
-                    {isDepositing ? '🎯 Processing... Check Console for Details' : 
-                      (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n)
-                        ? `🚀 Split SY Tokens into PT + YT`
-                        : `🚀 Deposit & Split into PT + YT Tokens`
-                    }
-                  </button>
+                  <div className="space-y-3">
+                    {/* Step 1: Deposit Options */}
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                      <div className="text-blue-400 font-semibold mb-3">💰 Step 1: Choose Your Action</div>
+                      
+                      {/* Option 1: Just Deposit (Wrap to SY) */}
+                      <button
+                        onClick={() => {
+                          if (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n) {
+                            // User has SY tokens, offer to wrap more
+                            void currentHook.wrapAsset(amount, false)
+                          } else {
+                            // User has no SY tokens, wrap to SY
+                            void currentHook.wrapAsset(amount, false)
+                          }
+                        }}
+                        disabled={!amount || isDepositing}
+                        className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
+                      >
+                        {isDepositing ? '🔄 Depositing...' : 
+                          (currentHook.syBalance && (currentHook.syBalance as bigint) > 0n)
+                            ? `💰 Deposit More ${ASSET_METADATA[selectedAsset].symbol} → SY Tokens`
+                            : `💰 Deposit ${ASSET_METADATA[selectedAsset].symbol} → SY Tokens`
+                        }
+                      </button>
+
+                      {/* Option 2: Split SY Tokens (if user has them) */}
+                      {currentHook.syBalance && (currentHook.syBalance as bigint) > 0n && (
+                        <button
+                          onClick={() => void currentHook.splitTokens(amount)}
+                          disabled={!amount || isDepositing}
+                          className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
+                        >
+                          🎲 Split SY Tokens → PT + YT
+                        </button>
+                      )}
+
+                      {/* Option 3: Deposit + Split (Combined) */}
+                      <button
+                        onClick={() => void currentHook.handleDepositAndSplit(amount)}
+                        disabled={!amount || isDepositing}
+                        className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors"
+                      >
+                        {isDepositing ? '🚀 Processing...' : '🚀 Deposit + Split → PT + YT (2 Steps)'}
+                      </button>
+
+                                      {/* Help text */}
+                <div className="text-xs text-gray-400 mt-3 space-y-1">
+                  <div>💡 <strong>Just Deposit:</strong> Get SY tokens (standardized yield)</div>
+                  <div>💡 <strong>Split:</strong> Convert SY to PT (fixed) + YT (variable) tokens</div>
+                  <div>💡 <strong>Combined:</strong> Do both in one transaction</div>
+                </div>
+
+                {/* Yield Explanation */}
+                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <div className="text-yellow-400 font-semibold mb-2">🌾 Understanding Yield</div>
+                  <div className="text-xs text-yellow-300 space-y-1">
+                    <div><strong>💰 Asset Yield (stCORE):</strong> Generates yield automatically over time</div>
+                    <div><strong>🎯 YT Tokens:</strong> Right to claim future yield from underlying stCORE</div>
+                    <div><strong>🔗 Connection:</strong> YT doesn't generate yield - it lets you claim stCORE's yield</div>
+                  </div>
+                  
+                  {/* Visual Flow */}
+                  <div className="mt-3 p-2 bg-yellow-600/20 rounded border border-yellow-500/50">
+                    <div className="text-xs text-yellow-200 font-medium mb-1">🔄 Yield Flow:</div>
+                    <div className="text-xs text-yellow-100">
+                      stCORE → Generates Yield → YT Tokens → Claim Yield
+                    </div>
+                  </div>
+                </div>
+                    </div>
                     
                                           {(isDepositing || currentHook.splitProgress.step !== 'idle') && (
                         <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
@@ -1955,7 +2086,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                                 Step 1: Wrapping to SY tokens
                                 {currentHook.splitProgress.step === 'waiting' && ' ✅'}
                                 {(currentHook.splitProgress.step === 'splitting' || currentHook.splitProgress.step === 'complete') && ' ✅'}
-                      </span>
+                              </span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <div className={`w-2 h-2 rounded-full ${
@@ -1968,7 +2099,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                               <span className={currentHook.splitProgress.step === 'splitting' ? 'text-yellow-400 font-semibold' : currentHook.splitProgress.step === 'complete' ? 'text-green-400 font-semibold' : ''}>
                                 Step 2: Splitting into PT + YT tokens
                                 {currentHook.splitProgress.step === 'complete' && ' ✅'}
-                      </span>
+                              </span>
                             </div>
                             {currentHook.splitProgress.message && (
                               <div className="text-blue-300 text-xs mt-2 font-medium">
@@ -2131,6 +2262,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                           <span className="text-sm text-white">{formatBalance(syBalance as bigint)} sy{ASSET_METADATA[selectedAsset].symbol}</span>
                         </div>
                         
+                        {/* SY Token Explanation */}
+                        <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                          <div className="text-xs text-blue-400 flex items-center">
+                            <span className="mr-2">💎</span>
+                            <span>Standardized yield tokens backed by underlying {ASSET_METADATA[selectedAsset].symbol}</span>
+                          </div>
+                        </div>
+                        
                         {hasSYTokens ? (
                           <div className="space-y-3">
                             <input
@@ -2285,7 +2424,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                         <h3 className="text-2xl font-semibold text-white mb-3">Loading Transactions</h3>
                         <p className="text-gray-400 text-lg">Fetching your transaction history from the blockchain...</p>
                       </div>
-                    ) : filteredTransactions.length === 0 ? (
+                    ) : paginatedTransactions.length === 0 ? (
                       <div className="text-center py-12">
                         <div className="w-20 h-20 bg-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-6 opacity-60">
                           <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2302,7 +2441,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                         </button>
                       </div>
                     ) : (
-                      filteredTransactions.map((tx) => (
+                      paginatedTransactions.map((tx) => (
                         <div
                           key={tx.id}
                           onClick={() => {
@@ -2351,6 +2490,54 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                           </div>
                         </div>
                       ))
+                    )}
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-6 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={goToFirstPage}
+                            disabled={currentPage === 1}
+                            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                          >
+                            ⏮️ First
+                          </button>
+                          <button
+                            onClick={goToPreviousPage}
+                            disabled={currentPage === 1}
+                            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                          >
+                            ◀️ Previous
+                          </button>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <span className="text-gray-400 text-sm">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                          <span className="text-gray-500 text-sm">
+                            ({filteredTransactions.length} total transactions)
+                          </span>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={goToNextPage}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                          >
+                            Next ▶️
+                          </button>
+                          <button
+                            onClick={goToLastPage}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                          >
+                            Last ⏭️
+                          </button>
+                        </div>
+                      </div>
                     )}
                     </div>
                   </div>

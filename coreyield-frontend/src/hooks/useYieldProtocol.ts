@@ -145,13 +145,26 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
+  // 🎯 STANDARDIZED: Get claimable yield from factory contract (same source as Portfolio tab)
+  // This ensures consistent yield amounts across all UI components
   const { data: accumulatedYield } = useReadContract({
-    address: syAddress,
-    abi: StandardizedYieldTokenABI.abi,
-    functionName: 'getAccumulatedYield',
-    args: address ? [address] : undefined,
+    address: CONTRACTS.FACTORY as Address,
+    abi: [
+      {
+        name: 'getClaimableYield',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [
+          { name: 'syToken', type: 'address' },
+          { name: 'user', type: 'address' }
+        ],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ],
+    functionName: 'getClaimableYield',
+    args: address && syAddress ? [syAddress as Address, address] : undefined,
     query: { 
-      enabled: !!address,
+      enabled: !!address && !!syAddress,
       refetchInterval: 3000
     }
   })
@@ -283,6 +296,8 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }, [ptBalance, address, marketData])
 
+
+
     // Get YT token balance
   const { 
     data: ytBalance, 
@@ -321,28 +336,46 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
 
 
-    // Get YT claimable yield
+    // Get YT claimable yield from the factory contract
   const { 
     data: ytClaimableYield, 
     refetch: refetchYtClaimable 
   } = useReadContract({
-    address: marketData ? marketData.ytToken as Address : undefined, // ytToken address
+    address: CONTRACTS.FACTORY as Address, // Use factory address instead of YT token address
     abi: [
       {
-        name: 'claimableYield',
+        name: 'getClaimableYield',
         type: 'function',
         stateMutability: 'view',
-        inputs: [{ name: 'user', type: 'address' }],
+        inputs: [
+          { name: 'syToken', type: 'address' },
+          { name: 'user', type: 'address' }
+        ],
         outputs: [{ name: '', type: 'uint256' }],
       },
     ],
-    functionName: 'claimableYield',
-    args: address ? [address] : undefined,
+    functionName: 'getClaimableYield',
+    args: address && marketData?.syToken ? [marketData.syToken as Address, address] : undefined,
     query: {
-      enabled: !!address && !!marketData?.ytToken,
+      enabled: !!address && !!marketData?.syToken,
       refetchInterval: 5000
     }
   })
+
+  // Debug YT claimable yield
+  useEffect(() => {
+    if (address && marketData?.syToken) {
+      console.log('🔍 YT CLAIMABLE YIELD DEBUG:', {
+        factoryAddress: CONTRACTS.FACTORY,
+        syTokenAddress: marketData.syToken,
+        userAddress: address,
+        ytClaimableYield,
+        ytClaimableYieldFormatted: ytClaimableYield ? formatUnits(ytClaimableYield as bigint, 18) : '0',
+        queryEnabled: !!address && !!marketData?.syToken,
+        marketData
+      })
+    }
+  }, [ytClaimableYield, address, marketData])
 
   // New function to add yield snapshots to YT tokens (for demo purposes)
   const handleAddYieldSnapshot = async (amount: string): Promise<void> => {
@@ -549,9 +582,16 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   useEffect(() => {
     if (isSplitSuccess) {
       console.log('🎉 SPLIT SUCCESS! Refreshing balances...')
+      console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
+        from: 'split_success',
+        to: 'complete',
+        timestamp: new Date().toISOString(),
+        previousStep: 'unknown'
+      })
+      
       toast.success('🎯 Split successful! You now have PT + YT tokens!')
       
-      // Update split progress
+      // Update split progress briefly
       setSplitProgress({ step: 'complete', message: 'Split completed successfully!' })
       
       // Refresh all balances
@@ -561,10 +601,17 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         refetchYtBalance()
       }, 1000)
       
-      // Reset progress after a delay
+      // 🎯 CRITICAL FIX: Reset progress IMMEDIATELY to allow new operations
       setTimeout(() => {
+        console.log('🔄 RESETTING SPLIT PROGRESS: Allowing new operations')
+        console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
+          from: 'complete',
+          to: 'idle',
+          timestamp: new Date().toISOString(),
+          reason: 'Auto-reset after split completion'
+        })
         setSplitProgress({ step: 'idle', message: '' })
-      }, 5000)
+      }, 500) // Reduced from 2 seconds to 0.5 seconds for immediate reset
     }
   }, [isSplitSuccess, refetchPtBalance, refetchYtBalance])
 
@@ -585,7 +632,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     try {
       const amountBigInt = parseEther(amount)
       
-      console.log('🔍 APPROVAL CHECK DEBUG:', {
+      console.log('🔍 APPROVAL CHECK DEBUG (FIXED VERSION):', {
         amount,
         amountBigInt: amountBigInt.toString(),
         syBalance: syBalance?.toString(),
@@ -594,18 +641,8 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         hasSYTokens: syBalance && (syBalance as bigint) > 0n
       })
       
-      // If user has SY tokens, they want to split - only check SY approval
-      if (syBalance && (syBalance as bigint) > 0n) {
-        // User has SY tokens, check if factory can spend them
-        if (!syAllowance || amountBigInt > (syAllowance as bigint)) {
-          console.log('✅ APPROVAL NEEDED: SY tokens need approval for splitting')
-          return true
-        }
-        console.log('✅ NO APPROVAL NEEDED: SY tokens already approved for splitting')
-        return false
-      }
-      
-      // User doesn't have SY tokens, they want to wrap - check asset approval
+      // 🎯 FIXED: Always check asset approval for wrapping operations
+      // Even if user has SY tokens, they still need asset approval to wrap more
       if (!allowance || amountBigInt > (allowance as bigint)) {
         console.log('✅ APPROVAL NEEDED: Asset needs approval for wrapping')
         return true
@@ -615,6 +652,35 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       return false
     } catch {
       console.log('❌ APPROVAL CHECK ERROR: Invalid amount format')
+      return true
+    }
+  }
+
+  // 🎯 NEW: Separate function to check if SY tokens need approval for splitting
+  // This function is ONLY for splitting operations, NOT for wrapping
+  const needsSYApproval = (amount: string): boolean => {
+    if (!amount) return true
+    
+    try {
+      const amountBigInt = parseEther(amount)
+      
+      console.log('🔍 SY APPROVAL CHECK DEBUG:', {
+        amount,
+        amountBigInt: amountBigInt.toString(),
+        syAllowance: syAllowance?.toString(),
+        hasSYTokens: syBalance && (syBalance as bigint) > 0n
+      })
+      
+      // Check if factory can spend SY tokens for splitting
+      if (!syAllowance || amountBigInt > (syAllowance as bigint)) {
+        console.log('✅ SY APPROVAL NEEDED: Factory needs approval to spend SY tokens')
+        return true
+      }
+      
+      console.log('✅ NO SY APPROVAL NEEDED: Factory already approved to spend SY tokens')
+      return false
+    } catch {
+      console.log('❌ SY APPROVAL CHECK ERROR: Invalid amount format')
       return true
     }
   }
@@ -746,10 +812,47 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  const wrapAsset = async (amount: string): Promise<void> => {
+  const wrapAsset = async (amount: string, autoSplit: boolean = false): Promise<void> => {
     if (!amount || !address) return
     
-    setSplitProgress({ step: 'wrapping', message: 'Starting wrap transaction...' })
+    // 🎯 COMPREHENSIVE LOGGING: Track why deposits might be blocked
+    console.log('🔍 DEPOSIT ATTEMPT DEBUG:', {
+      operation: 'wrapAsset',
+      autoSplit,
+      amount,
+      currentSplitProgress: splitProgress.step,
+      currentMessage: splitProgress.message,
+      timestamp: new Date().toISOString()
+    })
+    
+    // 🎯 FIXED: Less aggressive blocking - only block if actively processing
+    if (splitProgress.step === 'wrapping' || splitProgress.step === 'splitting') {
+      console.warn('⚠️ WRAP BLOCKED: Cannot wrap while actively processing', {
+        currentStep: splitProgress.step,
+        message: splitProgress.message,
+        blockedReason: 'Active operation in progress',
+        allowedSteps: ['idle', 'complete', 'waiting']
+      })
+      toast.error('Cannot deposit while operation is actively processing. Please wait for the current operation to complete.')
+      return
+    }
+    
+    // Allow deposits during 'waiting', 'complete' state, or when idle
+    if (splitProgress.step === 'complete') {
+      console.log('✅ DEPOSIT ALLOWED: Operation completed, allowing new deposits')
+    } else if (splitProgress.step === 'waiting') {
+      console.log('✅ DEPOSIT ALLOWED: Operation waiting, allowing new deposits')
+    } else if (splitProgress.step === 'idle') {
+      console.log('✅ DEPOSIT ALLOWED: System is idle, allowing new deposits')
+    }
+    
+    if (autoSplit) {
+      setSplitProgress({ step: 'wrapping', message: 'Starting wrap transaction...' })
+    } else {
+      // For simple deposits, don't change split progress state
+      console.log('💰 SIMPLE DEPOSIT: Wrapping to SY tokens (no split)')
+      toast.success('Depositing to SY tokens...')
+    }
     
     try {
       // Step 1: First wrap to SY tokens
@@ -759,11 +862,21 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         functionName: 'wrap',
         args: [parseEther(amount)]
       })
-      setSplitProgress({ step: 'waiting', message: 'Waiting for wrap to complete...' })
-      toast.success('Step 1/2: Wrapping to SY tokens...')
+      
+      if (autoSplit) {
+        setSplitProgress({ step: 'waiting', message: 'Waiting for wrap to complete...' })
+        toast.success('Step 1/2: Wrapping to SY tokens...')
+      } else {
+        // For simple deposits, just show success without changing split progress
+        console.log('✅ SIMPLE DEPOSIT: Wrap transaction sent successfully')
+        toast.success('Deposit transaction sent! Waiting for confirmation...')
+      }
       
     } catch (error) {
-      setSplitProgress({ step: 'idle', message: '' })
+      // Only reset split progress if this was part of auto-split
+      if (autoSplit) {
+        setSplitProgress({ step: 'idle', message: '' })
+      }
       toast.error('Failed to wrap tokens')
       console.error('Wrap error:', error)
     }
@@ -1072,20 +1185,34 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     console.log('🔍 Asset being refreshed:', selectedAssetKey)
     
     try {
+      console.log('📞 Calling refetchAssetBalance()...')
       refetchAssetBalance()
+      
+      console.log('📞 Calling refetchSyBalance()...')
       refetchSyBalance()
+      
+      console.log('📞 Calling refetchAllowance()...')
       refetchAllowance()
       
       // 🎯 CRITICAL: Also refresh PT/YT balances after split
-      if (refetchPtBalance) refetchPtBalance()
-      if (refetchYtBalance) refetchYtBalance()
-      if (refetchYtClaimable) refetchYtClaimable()
+      if (refetchPtBalance) {
+        console.log('📞 Calling refetchPtBalance()...')
+        refetchPtBalance()
+      }
+      if (refetchYtBalance) {
+        console.log('📞 Calling refetchYtBalance()...')
+        refetchYtBalance()
+      }
+      if (refetchYtClaimable) {
+        console.log('📞 Calling refetchYtClaimable()...')
+        refetchYtClaimable()
+      }
       
       console.log('✅ All refetch functions called successfully')
       
-      // Log current state
+      // Enhanced logging with multiple balance checks
       setTimeout(() => {
-        console.log('📊 CURRENT BALANCES AFTER REFRESH:', {
+        console.log('📊 BALANCE CHECK 1 (1 second after refresh):', {
           asset: selectedAssetKey,
           assetBalance: assetBalance ? formatUnits(assetBalance as bigint, 18) : '0',
           sy: syBalance ? formatUnits(syBalance as bigint, 18) : '0',
@@ -1095,6 +1222,20 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
           allowance: allowance ? formatUnits(allowance as bigint, 18) : '0'
         })
       }, 1000)
+      
+      // Additional balance check after 3 seconds
+      setTimeout(() => {
+        console.log('📊 BALANCE CHECK 2 (3 seconds after refresh):', {
+          asset: selectedAssetKey,
+          assetBalance: assetBalance ? formatUnits(assetBalance as bigint, 18) : '0',
+          sy: syBalance ? formatUnits(syBalance as bigint, 18) : '0',
+          pt: ptBalance ? formatUnits(ptBalance as bigint, 18) : '0',
+          yt: ytBalance ? formatUnits(ytBalance as bigint, 18) : '0',
+          ytClaimable: ytClaimableYield ? formatUnits(ytClaimableYield as bigint, 18) : '0',
+          allowance: allowance ? formatUnits(allowance as bigint, 18) : '0'
+        })
+      }, 3000)
+      
     } catch (error) {
       console.error('❌ ERROR REFRESHING BALANCES:', error)
     }
@@ -1218,58 +1359,146 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
   useEffect(() => {
     if (isApproveSuccess && approveHash) {
-      toast.success('Approval successful!')
+      console.log('✅ APPROVAL SUCCESS: Resetting split progress to allow new operations')
+      console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
+        from: 'approval_success',
+        to: 'idle',
+        timestamp: new Date().toISOString(),
+        previousStep: 'unknown'
+      })
+      
+      toast.success('Approval successful! You can now deposit or split tokens.')
       setNotification({
         type: 'success',
         title: 'Approval Successful!',
-        message: `Approved tokens for ${selectedAsset.symbol}`,
+        message: `Approved tokens for ${selectedAsset.symbol}. You can now deposit or split tokens.`,
         hash: approveHash
       })
       setTimeout(() => setNotification(null), 5000)
+      
+      // 🎯 CRITICAL FIX: Reset split progress after approval to allow new operations
+      setSplitProgress({ step: 'idle', message: '' })
+      
       refreshBalances()
     }
   }, [isApproveSuccess, approveHash, selectedAsset.symbol])
 
   useEffect(() => {
     if (isWrapSuccess && wrapHash) {
-      console.log('🎯 STEP 1 COMPLETE: Wrap successful!', {
+      console.log('🎯 WRAP COMPLETE: Wrap successful!', {
         hash: wrapHash,
         asset: selectedAsset.symbol,
         currentSYBalance: syBalance ? formatUnits(syBalance as bigint, 18) : '0'
       })
       
-      toast.success('Step 1 complete! Now splitting into PT + YT...')
-      setNotification({
-        type: 'success',
-        title: 'Step 1/2 Complete!',
-        message: `Wrapped ${selectedAsset.symbol} to SY tokens. Auto-splitting...`,
-        hash: wrapHash
-      })
-      setTimeout(() => setNotification(null), 5000)
+      // 🎯 ENHANCED BALANCE REFRESH: More aggressive and reliable balance updates
+      console.log('🔄 REFRESHING BALANCES: Starting enhanced refresh...')
+      
+      // Immediate refresh
       refreshBalances()
       
-      // Auto-split SY tokens after successful wrap
-      // This creates the PT + YT tokens from SY
+      // Enhanced refresh with longer delays to ensure blockchain state updates
       setTimeout(() => {
-        console.log('🔄 PREPARING STEP 2: About to split SY tokens...')
-        // Refresh balance first
-        refetchSyBalance().then(() => {
-          const currentSYBalance = formatUnits(syBalance as bigint || 0n, 18)
-          console.log('📊 Current SY Balance for splitting:', currentSYBalance)
-          
-          if (parseFloat(currentSYBalance) > 0) {
-            console.log('🚀 INITIATING STEP 2: Calling splitTokens with amount:', currentSYBalance)
-            setSplitProgress({ step: 'splitting', message: 'Auto-splitting SY tokens...' })
-            splitTokens(currentSYBalance)
-          } else {
-            console.warn('⚠️ No SY balance to split! Balance:', currentSYBalance)
-            setSplitProgress({ step: 'idle', message: '' })
-            toast.error('No SY tokens found to split. Please try again.')
-          }
+        console.log('🔄 REFRESH 1: 2 seconds after wrap success')
+        refreshBalances()
+        refetchAssetBalance()
+        refetchSyBalance()
+      }, 2000)
+      
+      setTimeout(() => {
+        console.log('🔄 REFRESH 2: 5 seconds after wrap success')
+        refreshBalances()
+        refetchAssetBalance()
+        refetchSyBalance()
+      }, 5000)
+      
+      setTimeout(() => {
+        console.log('🔄 REFRESH 3: 10 seconds after wrap success')
+        refreshBalances()
+        refetchAssetBalance()
+        refetchSyBalance()
+      }, 10000)
+      
+      // Check if this was a deposit-only operation or part of deposit+split
+      const wasDepositOnly = !splitProgress.step.includes('splitting')
+      
+      if (wasDepositOnly) {
+        // This was just a deposit/wrap operation
+        console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
+          from: 'deposit_only_wrap_success',
+          to: 'idle',
+          timestamp: new Date().toISOString(),
+          reason: 'Deposit-only operation completed'
         })
-      }, 3000) // Wait 3 seconds for balances to update
+        
+        toast.success('✅ Deposit successful! Your tokens are now wrapped as SY tokens.')
+        setNotification({
+          type: 'success',
+          title: 'Deposit Complete!',
+          message: `Successfully wrapped ${selectedAsset.symbol} to SY tokens. Check Portfolio tab for updated balances.`,
+          hash: wrapHash
+        })
+        setTimeout(() => setNotification(null), 5000)
+        
+        // Reset progress for deposit-only
+        setSplitProgress({ step: 'idle', message: '' })
+        
+        // Enhanced final balance check after deposit with multiple attempts
+        setTimeout(() => {
+          console.log('📊 DEPOSIT COMPLETE - Enhanced Final Balance Check')
+          refreshBalances()
+          refetchAssetBalance()
+          refetchSyBalance()
+          
+          // Log the updated balances
+          setTimeout(() => {
+            const finalAssetBalance = assetBalance ? formatUnits(assetBalance as bigint, 18) : '0'
+            const finalSYBalance = syBalance ? formatUnits(syBalance as bigint, 18) : '0'
+            
+            console.log('📊 DEPOSIT COMPLETE - Final Balance Check:', {
+              assetBalance: finalAssetBalance,
+              syBalance: finalSYBalance,
+              message: 'Deposit operation completed successfully'
+            })
+            
+            toast.success(`💰 Balance updated! Asset: ${finalAssetBalance}, SY: ${finalSYBalance}`)
+          }, 1000)
+        }, 3000)
+        
+      } else {
+        // This was part of deposit+split operation
+        toast.success('Step 1 complete! Now splitting into PT + YT...')
+        setNotification({
+          type: 'success',
+          title: 'Step 1/2 Complete!',
+          message: `Wrapped ${selectedAsset.symbol} to SY tokens. Auto-splitting...`,
+          hash: wrapHash
+        })
+        setTimeout(() => setNotification(null), 5000)
+        
+        // Auto-split SY tokens after successful wrap
+        // This creates the PT + YT tokens from SY
+        setTimeout(() => {
+          console.log('🔄 PREPARING STEP 2: About to split SY tokens...')
+          // Refresh balance first
+          refetchSyBalance().then(() => {
+            const currentSYBalance = formatUnits(syBalance as bigint || 0n, 18)
+            console.log('📊 Current SY Balance for splitting:', currentSYBalance)
+            
+            if (parseFloat(currentSYBalance) > 0) {
+              console.log('🚀 INITIATING STEP 2: Calling splitTokens with amount:', currentSYBalance)
+              setSplitProgress({ step: 'splitting', message: 'Auto-splitting SY tokens...' })
+              splitTokens(currentSYBalance)
+            } else {
+              console.warn('⚠️ No SY balance to split! Balance:', currentSYBalance)
+              setSplitProgress({ step: 'idle', message: '' })
+              toast.error('No SY tokens found to split. Please try again.')
+            }
+          })
+        }, 3000) // Wait 3 seconds for balances to update
+      }
     }
-  }, [isWrapSuccess, wrapHash, selectedAsset.symbol, syBalance])
+  }, [isWrapSuccess, wrapHash, selectedAsset.symbol, syBalance, splitProgress.step])
 
   useEffect(() => {
     if (isSplitSuccess && splitHash) {
@@ -1432,6 +1661,51 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       refetchAllowance()
     }
   }
+  
+  // 🎯 NEW: Function to manually reset split progress state
+  const resetSplitProgress = () => {
+    console.log('🔄 MANUAL RESET: Resetting split progress state')
+    setSplitProgress({ step: 'idle', message: '' })
+    toast.success('Split progress reset. You can now perform new operations.')
+  }
+  
+  // 🎯 NEW: Function to log current system state for debugging
+  const logCurrentState = () => {
+    console.log('🔍 CURRENT SYSTEM STATE DEBUG:', {
+      timestamp: new Date().toISOString(),
+      splitProgress: {
+        step: splitProgress.step,
+        message: splitProgress.message
+      },
+      canDeposit: !(splitProgress.step === 'wrapping' || splitProgress.step === 'waiting' || splitProgress.step === 'splitting'),
+      canSplit: !(splitProgress.step === 'wrapping' || splitProgress.step === 'waiting' || splitProgress.step === 'splitting'),
+      currentAsset: selectedAssetKey,
+      userAddress: address,
+      hasAssetBalance: !!assetBalance,
+      hasSYBalance: !!syBalance
+    })
+  }
+  
+  // 🎯 NEW: Function to force reset if stuck in blocking state
+  const forceResetIfStuck = () => {
+    console.log('🔧 FORCE RESET: Checking if system is stuck in blocking state')
+    
+    // If we're in a blocking state but no transaction is pending, force reset
+    if (splitProgress.step === 'wrapping' || splitProgress.step === 'waiting' || splitProgress.step === 'splitting') {
+      console.warn('⚠️ SYSTEM STUCK: Force resetting from blocking state', {
+        currentStep: splitProgress.step,
+        message: splitProgress.message,
+        timestamp: new Date().toISOString()
+      })
+      
+      setSplitProgress({ step: 'idle', message: '' })
+      toast.success('System unstuck! You can now perform new operations.')
+      return true
+    }
+    
+    console.log('✅ SYSTEM OK: Not stuck in blocking state')
+    return false
+  }
 
   return {
     // State
@@ -1474,6 +1748,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     formatBalance,
     formatYield,
     needsApproval,
+    needsSYApproval,
     canExecuteAction,
     setMaxAmount,
     refreshBalances,
@@ -1501,5 +1776,8 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     splitProgress,
     refreshAllowanceData,
     refetchSYAllowance,
+    resetSplitProgress,
+    logCurrentState,
+    forceResetIfStuck,
   } as const
 }

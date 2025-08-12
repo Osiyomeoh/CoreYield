@@ -22,6 +22,10 @@ export const useTransactionHistory = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastFetchedBlock, setLastFetchedBlock] = useState<number>(0)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [transactionsPerPage] = useState(10)
 
   // Fetch real transactions from blockchain events
   const fetchBlockchainTransactions = async (fromBlock: number, toBlock: number) => {
@@ -314,23 +318,65 @@ export const useTransactionHistory = () => {
     }
   }, [])
 
-  // Filter transactions by type
+  // Filter transactions by type and sort by timestamp (newest first)
   const filterTransactions = (type?: string) => {
-    if (!type || type === 'all') return transactions
-    return transactions.filter(tx => tx.type === type)
+    let filtered = transactions
+    
+    if (type && type !== 'all') {
+      filtered = transactions.filter(tx => tx.type === type)
+    }
+    
+    // Sort by timestamp: newest first
+    return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
-  // Search transactions by query
+  // Get paginated transactions for current page
+  const getPaginatedTransactions = (filteredTxs: Transaction[]) => {
+    const startIndex = (currentPage - 1) * transactionsPerPage
+    const endIndex = startIndex + transactionsPerPage
+    return filteredTxs.slice(startIndex, endIndex)
+  }
+
+  // Get total pages for pagination
+  const getTotalPages = (filteredTxs: Transaction[]) => {
+    return Math.ceil(filteredTxs.length / transactionsPerPage)
+  }
+
+  // Navigation functions
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, getTotalPages(transactions))))
+  }
+
+  const goToNextPage = () => {
+    const totalPages = getTotalPages(transactions)
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const goToFirstPage = () => setCurrentPage(1)
+  const goToLastPage = () => setCurrentPage(getTotalPages(transactions))
+
+  // Search transactions by query and sort by timestamp (newest first)
   const searchTransactions = (query: string) => {
     if (!query.trim()) return transactions
     
     const lowerQuery = query.toLowerCase()
-    return transactions.filter(tx => 
+    const filtered = transactions.filter(tx => 
       tx.asset.toLowerCase().includes(lowerQuery) ||
       tx.details.toLowerCase().includes(lowerQuery) ||
       tx.txHash.toLowerCase().includes(lowerQuery) ||
       tx.type.toLowerCase().includes(lowerQuery)
     )
+    
+    // Sort by timestamp: newest first
+    return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
   // Get transaction statistics
@@ -463,6 +509,17 @@ export const useTransactionHistory = () => {
     searchTransactions,
     getTransactionStats,
     refreshTransactions,
-    searchRecentYieldClaims
+    searchRecentYieldClaims,
+    // Pagination
+    currentPage,
+    setCurrentPage,
+    transactionsPerPage,
+    getPaginatedTransactions,
+    getTotalPages,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+    goToFirstPage,
+    goToLastPage
   }
 } 
