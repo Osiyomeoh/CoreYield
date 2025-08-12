@@ -1,12 +1,10 @@
-// contracts/mocks/MockStCORE.sol (Enhanced)
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MockStCORE is ERC20, Ownable {
-    uint256 public rewardRate = 850; // 8.5% APY in basis points
+    uint256 public rewardRate = 850;
     uint256 public totalStaked;
     uint256 public rewardPool;
     
@@ -20,8 +18,8 @@ contract MockStCORE is ERC20, Ownable {
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     
     constructor() ERC20("Staked CORE", "stCORE") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10**18); // 1M tokens for testing
-        _mint(address(this), 1000000 * 10**18); // Reward pool
+        _mint(msg.sender, 1000000 * 10**18);
+        _mint(address(this), 1000000 * 10**18);
         rewardPool = 1000000 * 10**18;
         lastUpdateTime[msg.sender] = block.timestamp;
         stakingTime[msg.sender] = block.timestamp;
@@ -56,9 +54,8 @@ contract MockStCORE is ERC20, Ownable {
         uint256 timeElapsed = block.timestamp - lastUpdateTime[account];
         uint256 baseReward = (balanceOf(account) * rewardRate * timeElapsed) / (365 days * 10000);
         
-        // Bonus for long-term staking
         uint256 stakingDuration = block.timestamp - stakingTime[account];
-        uint256 bonus = stakingDuration > 30 days ? baseReward / 10 : 0; // 10% bonus after 30 days
+        uint256 bonus = stakingDuration > 30 days ? baseReward / 10 : 0;
         
         return baseReward + bonus;
     }
@@ -78,13 +75,12 @@ contract MockStCORE is ERC20, Ownable {
     }
     
     function setRewardRate(uint256 newRate) external onlyOwner {
-        require(newRate <= 2000, "Rate too high"); // Max 20%
+        require(newRate <= 2000, "Rate too high");
         uint256 oldRate = rewardRate;
         rewardRate = newRate;
         emit RewardRateUpdated(oldRate, newRate);
     }
     
-    // Testing helpers
     function fastForwardTime(uint256 timeInSeconds) external {
         lastUpdateTime[msg.sender] = block.timestamp - timeInSeconds;
     }

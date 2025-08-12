@@ -1,8 +1,6 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 interface ICoreYieldFactory {
-    // Events
     event MarketCreated(
         address indexed syToken,
         address indexed ptToken,
@@ -41,6 +39,7 @@ interface ICoreYieldFactory {
     
     event MarketPaused(address indexed syToken, address indexed by);
     event MarketResumed(address indexed syToken, address indexed by);
+    event YieldSourceSet(address indexed asset, address indexed yieldContract, string sourceName);
     
     struct Market {
         bool active;
@@ -131,6 +130,10 @@ interface ICoreYieldFactory {
     
     function getClaimableYield(address syToken, address user) external view returns (uint256);
     function getMarketValue(address syToken, address user) external view returns (uint256);
+    
+    function setYieldSource(address asset, address yieldContract, string memory sourceName) external;
+    function getYieldSource(address asset) external view returns (address, string memory, uint256);
+    function getRealYieldAPY(address asset) external view returns (uint256);
     
     function getProtocolStats() external view returns (
         uint256 totalMarkets,

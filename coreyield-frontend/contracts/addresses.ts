@@ -1,40 +1,44 @@
-// CoreYield Protocol - Deployed Contract Addresses
-// Network: Core Testnet (Chain ID: 1114)
-// Deployment Date: 2025-08-11 (Updated with yield claiming fixes)
 
 export const CONTRACTS = {
-  FACTORY: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98',
-  AMM: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98', // Factory also acts as AMM
-  LIQUIDITY_MINING: '0xdCDDf32c0a871d0ec431102Bb2EaD837959bba98', // Factory also handles LM
+  FACTORY: '0x89f07f11887f2436C53FdEf22b34832C82d797DE',
+  AMM: '0x89f07f11887f2436C53FdEf22b34832C82d797DE',
+  LIQUIDITY_MINING: '0x89f07f11887f2436C53FdEf22b34832C82d797DE',
   MOCK_ASSETS: {
-    stCORE: '0x3D6355e7637fdefBf734c053B28F64848Fd08f7b',
-    lstBTC: '0x04Fdb265D4BEa2649c6eed5EC94c41C5317B88f9',
-    dualCORE: '0x8de905f721A8CB31A5CA9D0DB01dEf1A4df34581',
+    stCORE: '0x415cDc9111c4A57a1E5599716E876bFa5f75B69D',
+    lstBTC: '0x138d153ba2435F3AF3Da30684034Cfb9b1b2f47A',
+    dualCORE: '0x1854dA2464a036517511418ff57218b25eb6976B',
   },
   SY_TOKENS: {
-    'SY-stCORE': '0x0231Ca3b6993353ad4Fba8E4484190252B15c603',
-    'SY-lstBTC': '0x5c44c0ED83Cc1b2B12FA5C268Ec469146d667a85',
-    'SY-dualCORE': '0x4300f010a1Bff1a7019351314049e42690Ab8c44',
+    'SY-stCORE': '0x58Ecee33932D5C1CDe558f028E79C722d0B8ebd9',
+    'SY-lstBTC': '0xe2Fc813E0a3893A6F6E673c31bBB63829AD9fADF',
+    'SY-dualCORE': '0xb9eaf48C9c7F19216A54D0cCADC3709a4CB7f9D6',
   },
   MARKETS: {
     stCORE: {
-      syToken: '0x0231Ca3b6993353ad4Fba8E4484190252B15c603',
-      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
-      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      syToken: '0x58Ecee33932D5C1CDe558f028E79C722d0B8ebd9',
+      ptToken: '0xA72A9a3D187e17F2D13C6531f1EbAa953C39a57E',
+      ytToken: '0x0d5931Cc06a28aEBd44c4a99028158EC6D3E46DB',
     },
     lstBTC: {
-      syToken: '0x5c44c0ED83Cc1b2B12FA5C268Ec469146d667a85',
-      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
-      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      syToken: '0xe2Fc813E0a3893A6F6E673c31bBB63829AD9fADF',
+      ptToken: '0xb3E5E8640cA609e7Da2C7aE048CB6235Ea51f29D',
+      ytToken: '0xA1E636968247baA355d317dce14eCc8c608d08e9',
     },
     dualCORE: {
-      syToken: '0x4300f010a1Bff1a7019351314049e42690Ab8c44',
-      ptToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
-      ytToken: '0x0000000000000000000000000000000000000000', // Will be created when market is used
+      syToken: '0xb9eaf48C9c7F19216A54D0cCADC3709a4CB7f9D6',
+      ptToken: '0x2262bf987E5E80aAC9f8A67E2E7cB9B06AD16102',
+      ytToken: '0x45214e47C13723B6eBBdd6f83776D47e6CFd59Ee',
     },
   },
   PRICE_ORACLE: '0xcD457F5A16D6f6eE2996b8344DB8d55d382229B2',
   DEPLOYER: '0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663',
+  
+  YIELD_SOURCES: {
+    LIDO_STAKING: '0x7cE86A2060dc4dc59eFDC7FFf7aEfC8264f86EC3',
+    AAVE_LENDING: '0xf09BfA699430aD29b0e4391f1619aaDd924aA8A1',
+    CURVE_LP: '0xF2e659fD3ea0Aa7B6f8eDB6D7CC9af80A4528cD1',
+  },
+  
   CHAIN_ID: 1114,
   NETWORK: 'coreTestnet',
 } as const
@@ -46,7 +50,6 @@ export const CHAIN_CONFIG = {
   explorerUrl: 'https://scan.test2.btcs.network',
 } as const
 
-// Asset Metadata - This was missing!
 export const ASSET_METADATA = {
   stCORE: {
     name: 'Liquid Staked CORE',
@@ -83,7 +86,6 @@ export const ASSET_METADATA = {
   },
 } as const
 
-// Type definitions for TypeScript
 export type AssetKey = keyof typeof ASSET_METADATA
 export type ContractAddresses = typeof CONTRACTS
 export type AssetMetadata = typeof ASSET_METADATA

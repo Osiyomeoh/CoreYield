@@ -16,7 +16,6 @@ export const PriceDisplay: React.FC<PriceDisplayProps> = ({
   showUSD = true,
   className = '' 
 }) => {
-  // Get real-time price from Chainlink Price Oracle
   const { 
     data: assetPrice, 
     isLoading: priceLoading,
@@ -36,18 +35,15 @@ export const PriceDisplay: React.FC<PriceDisplayProps> = ({
     args: [assetAddress],
     query: { 
       enabled: !!assetAddress,
-      refetchInterval: 10000 // Refresh every 10 seconds
+      refetchInterval: 10000
     }
   })
 
-  // Calculate real-time price
   const getRealTimePrice = (): number => {
     if (!assetPrice) return 0
-    // Price oracle returns price in USD with 8 decimals
     return Number(assetPrice) / Math.pow(10, 8)
   }
 
-  // Calculate USD value
   const getUSDValue = (): string => {
     if (!balance || !assetPrice) return '$0.00'
     const balanceInTokens = Number(balance) / Math.pow(10, 18)

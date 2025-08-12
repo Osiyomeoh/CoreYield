@@ -46,7 +46,6 @@ function App() {
     setShowCalculator(false)
   }
 
-  // Removed unused handleNavigate function
 
   const handleOpenAnalytics = () => {
     setShowAnalytics(true)
@@ -84,12 +83,10 @@ function App() {
         <Toaster position="bottom-right" />
         
         {currentView === 'landing' ? (
-          // Landing page - no mobile menu
           <div className="flex-1">
             <LandingPage onLaunchApp={handleLaunchApp} onShowEducation={handleShowEducation} />
           </div>
         ) : (
-          // Dashboard and other views - with mobile menu
           <div className="flex-1">
             {currentView === 'dashboard' && (
               <MainDashboard 

@@ -12,7 +12,6 @@ import { parseEther, formatUnits, type Address } from 'viem'
 import toast from 'react-hot-toast'
 import { CONTRACTS, ASSET_METADATA } from '@contracts/addresses'
 
-// Import the new ABIs from redeployed contracts
 import MockStCOREABI from '../abis/MockStCORE.json'
 import MockLstBTCABI from '../abis/MockLstBTC.json'
 import MockDualCOREABI from '../abis/MockDualCORE.json'
@@ -26,7 +25,7 @@ interface NotificationProps {
   hash?: string
 }
 
-type AssetKey = 'stCORE' | 'lstBTC' | 'dualCORE' // All deployed assets
+type AssetKey = 'stCORE' | 'lstBTC' | 'dualCORE'
 
 export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   const { address, isConnected } = useAccount()
@@ -41,9 +40,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   const assetAddress = CONTRACTS.MOCK_ASSETS[selectedAssetKey] as Address
   const syAddress = CONTRACTS.SY_TOKENS[`SY-${selectedAssetKey}`] as Address
 
-  // Auto-onboarding state
 
-  // Get the correct ABI for the selected asset
   const getAssetABI = (key: AssetKey) => {
     const abiMap = {
       stCORE: MockStCOREABI.abi,
@@ -55,12 +52,10 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
   const assetABI = getAssetABI(selectedAssetKey)
 
-  // ========== CONTRACT READS ==========
   
-  // Get real-time price from Chainlink Price Oracle
   const { 
     data: assetPrice, 
-    refetch: refetchAssetPrice 
+ 
   } = useReadContract({
     address: CONTRACTS.PRICE_ORACLE as Address,
     abi: [
@@ -76,7 +71,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     args: [assetAddress],
     query: { 
       enabled: !!assetAddress,
-      refetchInterval: 10000 // Refresh every 10 seconds
+      refetchInterval: 10000
     }
   })
 
@@ -94,7 +89,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // Debug balance updates
   useEffect(() => {
     console.log(`🔍 ${selectedAssetKey} BALANCE UPDATE:`, {
       asset: selectedAssetKey,
@@ -133,7 +127,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // Read SY token allowance to factory contract
   const { data: syAllowance, refetch: refetchSYAllowance } = useReadContract({
     address: syAddress,
     abi: StandardizedYieldTokenABI.abi,
@@ -141,12 +134,10 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     args: address ? [address, CONTRACTS.FACTORY as Address] : undefined,
     query: {
       enabled: !!address && !!syAddress,
-      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchInterval: 5000,
     }
   })
 
-  // 🎯 STANDARDIZED: Get claimable yield from factory contract (same source as Portfolio tab)
-  // This ensures consistent yield amounts across all UI components
   const { data: accumulatedYield } = useReadContract({
     address: CONTRACTS.FACTORY as Address,
     abi: [
@@ -169,9 +160,50 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
+  const { data: yieldSourceInfo } = useReadContract({
+    address: CONTRACTS.FACTORY as Address,
+    abi: [
+      {
+        name: 'getYieldSource',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'asset', type: 'address' }],
+        outputs: [
+          { name: 'yieldContract', type: 'address' },
+          { name: 'sourceName', type: 'string' },
+          { name: 'apy', type: 'uint256' }
+        ],
+      },
+    ],
+    functionName: 'getYieldSource',
+    args: [assetAddress],
+    query: { 
+      enabled: !!assetAddress,
+      refetchInterval: 5000
+    }
+  })
+
+  const { data: realYieldAPY } = useReadContract({
+    address: CONTRACTS.FACTORY as Address,
+    abi: [
+      {
+        name: 'getRealYieldAPY',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'asset', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ],
+    functionName: 'getRealYieldAPY',
+    args: [assetAddress],
+    query: { 
+      enabled: !!assetAddress,
+      refetchInterval: 5000
+    }
+  })
 
 
-  // Market data structure based on the new contract
+
   interface MarketData {
     active: boolean
     syToken: string
@@ -196,35 +228,28 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }) as { data: MarketData | undefined }
 
-  // Debug logging for market data
   useEffect(() => {
     console.log('🔍 COMPREHENSIVE MARKET DEBUG:', {
-      // Current Selection
       selectedAsset: selectedAsset.symbol,
       selectedAssetKey,
       syTokenAddress: syAddress,
       
-      // Market Selection Logic
       marketData,
       marketDataType: typeof marketData,
       isMarketDataAvailable: !!marketData,
       isMarketActive: marketData ? marketData.active : false,
       
-      // Market Structure
       ptTokenFromMarket: marketData ? marketData.ptToken : null,
       ytTokenFromMarket: marketData ? marketData.ytToken : null,
       syTokenFromMarket: marketData ? marketData.syToken : null,
       maturityFromMarket: marketData ? marketData.maturity : null,
       
-      // All Markets
-      allExistingMarkets: undefined, // No longer fetching all markets here
-      totalMarkets: 0, // No longer fetching all markets here
+      allExistingMarkets: undefined,
+      totalMarkets: 0,
       
-      // Full Debug
       factoryAddress: CONTRACTS.FACTORY
     })
     
-    // Check if market SY token matches our SY token
     if (marketData && marketData.syToken) {
       const marketSYToken = marketData.syToken
       const isCorrectMarket = marketSYToken.toLowerCase() === syAddress.toLowerCase()
@@ -243,12 +268,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
           expectedSYToken: syAddress,
           actualSYToken: marketSYToken,
           suggestion: 'Need to create a market for this SY token',
-          allAvailableMarkets: undefined // No longer fetching all markets here
+          allAvailableMarkets: undefined
         })
       }
     }
     
-    // If market data is empty, it means the market doesn't exist
     if (syAddress && !marketData) {
       console.warn('⚠️ MARKET NOT FOUND:', {
         syToken: syAddress,
@@ -260,12 +284,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }, [marketData, syAddress, selectedAsset.symbol, selectedAssetKey])
 
-    // Get PT token balance
   const { 
     data: ptBalance, 
     refetch: refetchPtBalance 
   } = useReadContract({
-    address: marketData ? marketData.ptToken as Address : undefined, // ptToken address from market data
+    address: marketData ? marketData.ptToken as Address : undefined,
     abi: [
       {
         name: 'balanceOf',
@@ -283,7 +306,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // Debug PT balance
   useEffect(() => {
     if (address && marketData?.ptToken) {
       console.log('🔍 PT BALANCE DEBUG:', {
@@ -298,12 +320,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
 
 
-    // Get YT token balance
   const { 
     data: ytBalance, 
     refetch: refetchYtBalance 
   } = useReadContract({
-    address: marketData ? marketData.ytToken as Address : undefined, // ytToken address from market data
+    address: marketData ? marketData.ytToken as Address : undefined,
     abi: [
       {
         name: 'balanceOf',
@@ -321,7 +342,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // Debug YT balance
   useEffect(() => {
     if (address && marketData?.ytToken) {
       console.log('🔍 YT BALANCE DEBUG:', {
@@ -336,12 +356,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
 
 
-    // Get YT claimable yield from the factory contract
   const { 
     data: ytClaimableYield, 
     refetch: refetchYtClaimable 
   } = useReadContract({
-    address: CONTRACTS.FACTORY as Address, // Use factory address instead of YT token address
+    address: CONTRACTS.FACTORY as Address,
     abi: [
       {
         name: 'getClaimableYield',
@@ -362,7 +381,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // Debug YT claimable yield
   useEffect(() => {
     if (address && marketData?.syToken) {
       console.log('🔍 YT CLAIMABLE YIELD DEBUG:', {
@@ -377,7 +395,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }, [ytClaimableYield, address, marketData])
 
-  // New function to add yield snapshots to YT tokens (for demo purposes)
   const handleAddYieldSnapshot = async (amount: string): Promise<void> => {
     const ytAddress = marketData ? marketData.ytToken as Address : undefined
     if (!address || !ytAddress || !amount) return
@@ -408,7 +425,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       console.log('✅ Yield snapshot added successfully')
       toast.success('🌱 Added yield snapshot to YT tokens!')
       
-      // Refresh balances after adding yield
       setTimeout(() => {
         refreshBalances()
       }, 2000)
@@ -419,29 +435,25 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Improved PT implied yield calculation with realistic APY
   const calculatePTImpliedYield = (ptAmount: bigint, daysHeld: number): number => {
     if (!ptAmount || ptAmount === 0n) return 0
     const ptBalance = Number(ptAmount) / 1e18
-    const assetAPY = selectedAsset.apy / 100 // Convert percentage to decimal
+    const assetAPY = selectedAsset.apy / 100
     const dailyRate = assetAPY / 365
     return ptBalance * dailyRate * daysHeld
   }
 
-  // Calculate YT yield based on time and APY
   const calculateYTYield = (ytAmount: bigint, daysHeld: number): number => {
     if (!ytAmount || ytAmount === 0n) return 0
     const ytBalance = Number(ytAmount) / 1e18
-    const assetAPY = selectedAsset.apy / 100 // Convert percentage to decimal
+    const assetAPY = selectedAsset.apy / 100
     const dailyRate = assetAPY / 365
     return ytBalance * dailyRate * daysHeld
   }
 
-  // Get PT holding time (mock for now - in real implementation, track from mint timestamp)
-  const ptHoldingDays = 30 // Mock: assume held for 30 days
+  const ptHoldingDays = 30
   const ptImpliedYield = ptBalance ? calculatePTImpliedYield(ptBalance as bigint, ptHoldingDays) : 0
   
-  // Calculate YT yield
   const ytCalculatedYield = ytBalance ? calculateYTYield(ytBalance as bigint, ptHoldingDays) : 0
 
   const { data: coreBalance } = useBalance({
@@ -452,7 +464,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   })
 
-  // ========== CONTRACT WRITES ==========
   const { 
     writeContract: writeMint, 
     data: mintHash, 
@@ -503,7 +514,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
   const { 
     writeContract: writeCreateMarket, 
-    data: createMarketHash
+
   } = useWriteContract()
 
   const { 
@@ -512,7 +523,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     isPending: isAddYieldPending 
   } = useWriteContract()
 
-  // ========== TRANSACTION RECEIPTS ==========
   const { 
     isLoading: isMintWaiting, 
     isSuccess: isMintSuccess 
@@ -560,25 +570,20 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
 
 
 
-  // ========== TRANSACTION SUCCESS HANDLERS ==========
-  // Handle approval success and refresh allowance data
   useEffect(() => {
     if (isApproveSuccess) {
       console.log('✅ APPROVAL SUCCESS! Refreshing allowance data...')
       toast.success('Approval successful! You can now split your tokens.')
       
-      // Refresh allowance data
       refetchSYAllowance()
       refetchAllowance()
       
-      // Also refresh balances
       setTimeout(() => {
         refreshBalances()
       }, 1000)
     }
   }, [isApproveSuccess, refetchSYAllowance, refetchAllowance])
 
-  // Handle split success and refresh balances
   useEffect(() => {
     if (isSplitSuccess) {
       console.log('🎉 SPLIT SUCCESS! Refreshing balances...')
@@ -591,17 +596,14 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       
       toast.success('🎯 Split successful! You now have PT + YT tokens!')
       
-      // Update split progress briefly
       setSplitProgress({ step: 'complete', message: 'Split completed successfully!' })
       
-      // Refresh all balances
       setTimeout(() => {
         refreshBalances()
         refetchPtBalance()
         refetchYtBalance()
       }, 1000)
       
-      // 🎯 CRITICAL FIX: Reset progress IMMEDIATELY to allow new operations
       setTimeout(() => {
         console.log('🔄 RESETTING SPLIT PROGRESS: Allowing new operations')
         console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
@@ -611,11 +613,10 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
           reason: 'Auto-reset after split completion'
         })
         setSplitProgress({ step: 'idle', message: '' })
-      }, 500) // Reduced from 2 seconds to 0.5 seconds for immediate reset
+      }, 500)
     }
   }, [isSplitSuccess, refetchPtBalance, refetchYtBalance])
 
-  // ========== HELPER FUNCTIONS ==========
   const formatBalance = (balance: bigint | undefined, decimals = 18): string => {
     if (!balance) return '0.0000'
     return parseFloat(formatUnits(balance, decimals)).toFixed(4)
@@ -641,8 +642,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         hasSYTokens: syBalance && (syBalance as bigint) > 0n
       })
       
-      // 🎯 FIXED: Always check asset approval for wrapping operations
-      // Even if user has SY tokens, they still need asset approval to wrap more
       if (!allowance || amountBigInt > (allowance as bigint)) {
         console.log('✅ APPROVAL NEEDED: Asset needs approval for wrapping')
         return true
@@ -656,8 +655,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // 🎯 NEW: Separate function to check if SY tokens need approval for splitting
-  // This function is ONLY for splitting operations, NOT for wrapping
   const needsSYApproval = (amount: string): boolean => {
     if (!amount) return true
     
@@ -671,7 +668,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         hasSYTokens: syBalance && (syBalance as bigint) > 0n
       })
       
-      // Check if factory can spend SY tokens for splitting
       if (!syAllowance || amountBigInt > (syAllowance as bigint)) {
         console.log('✅ SY APPROVAL NEEDED: Factory needs approval to spend SY tokens')
         return true
@@ -709,14 +705,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     return ''
   }
 
-  // Helper function to get real-time USD price
   const getRealTimePrice = (): number => {
     if (!assetPrice) return 0
-    // Price oracle returns price in USD with 8 decimals
     return Number(assetPrice) / Math.pow(10, 8)
   }
 
-  // Helper function to format balance in USD
   const formatBalanceUSD = (balance: bigint | undefined): string => {
     if (!balance || !assetPrice) return '$0.00'
     const balanceInTokens = Number(balance) / Math.pow(10, 18)
@@ -724,7 +717,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     return `$${(balanceInTokens * priceInUSD).toFixed(2)}`
   }
 
-  // ========== ACTION HANDLERS ==========
   const handleMintTestTokens = async (amount: string = '10000'): Promise<void> => {
     if (!address) return
     
@@ -742,7 +734,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Function to mint custom amount of test tokens
   const handleMintCustomAmount = async (customAmount: string): Promise<void> => {
     if (!address || !customAmount) return
     
@@ -777,7 +768,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Add SY token approval for factory contract
   const approveSYTokens = async (amount: string): Promise<void> => {
     if (!amount) return
     
@@ -815,7 +805,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   const wrapAsset = async (amount: string, autoSplit: boolean = false): Promise<void> => {
     if (!amount || !address) return
     
-    // 🎯 COMPREHENSIVE LOGGING: Track why deposits might be blocked
     console.log('🔍 DEPOSIT ATTEMPT DEBUG:', {
       operation: 'wrapAsset',
       autoSplit,
@@ -825,7 +814,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       timestamp: new Date().toISOString()
     })
     
-    // 🎯 FIXED: Less aggressive blocking - only block if actively processing
     if (splitProgress.step === 'wrapping' || splitProgress.step === 'splitting') {
       console.warn('⚠️ WRAP BLOCKED: Cannot wrap while actively processing', {
         currentStep: splitProgress.step,
@@ -837,7 +825,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       return
     }
     
-    // Allow deposits during 'waiting', 'complete' state, or when idle
     if (splitProgress.step === 'complete') {
       console.log('✅ DEPOSIT ALLOWED: Operation completed, allowing new deposits')
     } else if (splitProgress.step === 'waiting') {
@@ -849,13 +836,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     if (autoSplit) {
       setSplitProgress({ step: 'wrapping', message: 'Starting wrap transaction...' })
     } else {
-      // For simple deposits, don't change split progress state
       console.log('💰 SIMPLE DEPOSIT: Wrapping to SY tokens (no split)')
       toast.success('Depositing to SY tokens...')
     }
     
     try {
-      // Step 1: First wrap to SY tokens
       await writeWrap({
         address: syAddress,
         abi: StandardizedYieldTokenABI.abi,
@@ -867,13 +852,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         setSplitProgress({ step: 'waiting', message: 'Waiting for wrap to complete...' })
         toast.success('Step 1/2: Wrapping to SY tokens...')
       } else {
-        // For simple deposits, just show success without changing split progress
         console.log('✅ SIMPLE DEPOSIT: Wrap transaction sent successfully')
         toast.success('Deposit transaction sent! Waiting for confirmation...')
       }
       
     } catch (error) {
-      // Only reset split progress if this was part of auto-split
       if (autoSplit) {
         setSplitProgress({ step: 'idle', message: '' })
       }
@@ -882,7 +865,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // New function specifically for splitting SY tokens into PT + YT
   const splitTokens = async (amount: string): Promise<void> => {
     if (!amount || !address) return
     
@@ -890,14 +872,13 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     
     console.log('💫 STEP 2 STARTING: handleSplitTokens called', {
       amount,
-      marketId: syAddress, // Use syAddress as marketId for splitTokens
+      marketId: syAddress,
       factoryAddress: CONTRACTS.FACTORY,
       userAddress: address,
       marketExists: !!marketData,
       marketData: marketData
     })
 
-    // Check if user has approved factory to spend SY tokens
     const amountBigInt = parseEther(amount)
     if (!syAllowance || amountBigInt > (syAllowance as bigint)) {
       console.error('❌ CANNOT SPLIT: Insufficient SY token approval!', {
@@ -910,14 +891,12 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       return
     }
 
-    // ⚠️ Check if market exists before trying to split
     if (!marketData) {
       console.error('❌ CANNOT SPLIT: Market does not exist!', {
         syToken: syAddress,
         message: 'The market must be created before tokens can be split. Creating market first...'
       })
       
-      // Try to create the market first
       toast.error('Market not found! Creating market first...')
       await handleCreateMarket()
       return
@@ -925,8 +904,8 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     
     try {
       const syAmount = parseEther(amount)
-      const minPTAmount = syAmount // 1:1 ratio for now
-      const minYTAmount = syAmount // 1:1 ratio for now
+      const minPTAmount = syAmount
+      const minYTAmount = syAmount
       
       console.log('📞 CALLING CONTRACT: splitTokens with args:', {
         syToken: syAddress,
@@ -980,7 +959,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   const claimYield = async (): Promise<void> => {
     if (!address) return
     
-    // Debug logging
     console.log('=== YIELD CLAIM DEBUG ===')
     console.log('Claiming yield for:', selectedAssetKey)
     console.log('SY Address:', syAddress)
@@ -991,7 +969,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     console.log('Network Chain ID:', window.ethereum?.chainId)
     console.log('========================')
     
-    // Check if there's actually yield to claim
     if (!accumulatedYield || accumulatedYield === 0n) {
       toast.error('No yield available to claim')
       console.log('No yield available - returning early')
@@ -1018,14 +995,12 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Function to check user position and claimable yield before claiming
   const checkUserPosition = async (): Promise<void> => {
     if (!address || !syAddress || !publicClient) return
     
     try {
       console.log('🔍 Checking user position before claiming...')
       
-      // Read user position from contract using public client
       const userPosition = await publicClient.readContract({
         address: CONTRACTS.FACTORY as Address,
         abi: CoreYieldFactoryABI.abi,
@@ -1035,7 +1010,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       
       console.log('📊 User position data:', userPosition)
       
-      // Read claimable yield
       const claimableYield = await publicClient.readContract({
         address: CONTRACTS.FACTORY as Address,
         abi: CoreYieldFactoryABI.abi,
@@ -1045,7 +1019,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       
       console.log('💰 Claimable yield:', claimableYield)
       
-      // Read market data
       const market = await publicClient.readContract({
         address: CONTRACTS.FACTORY as Address,
         abi: CoreYieldFactoryABI.abi,
@@ -1060,11 +1033,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Function to claim YT yield from the CoreYieldFactory contract
   const handleClaimYTYield = async (): Promise<void> => {
     if (!address || !syAddress) return
     
-    // First check user position
     await checkUserPosition()
     
     console.log('🎲 Attempting to claim YT yield...', {
@@ -1092,7 +1063,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         address: CONTRACTS.FACTORY as Address,
         abi: CoreYieldFactoryABI.abi,
         functionName: 'claimYield',
-        args: [syAddress] // Pass the SY token address as parameter
+        args: [syAddress]
       })
       console.log('✅ YT Claim transaction initiated successfully')
       console.log('🔍 Transaction sent! Now waiting for blockchain confirmation...')
@@ -1110,7 +1081,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // New function to redeem PT tokens (at maturity or with YT)
   const redeemPT = async (amount: string): Promise<void> => {
     if (!address || !amount) return
     
@@ -1143,7 +1113,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // Function to create market if it doesn't exist
   const handleCreateMarket = async (): Promise<void> => {
     if (!address) return
     
@@ -1162,12 +1131,12 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         abi: CoreYieldFactoryABI.abi,
         functionName: 'createMarket',
         args: [
-          syAddress, // syToken address
-          365 * 24 * 60 * 60, // maturityDuration (1 year in seconds)
-          `PT-${asset.symbol}`, // ptName
-          `PT-${asset.symbol}`, // ptSymbol  
-          `YT-${asset.symbol}`, // ytName
-          `YT-${asset.symbol}`, // ytSymbol
+          syAddress,
+          365 * 24 * 60 * 60,
+          `PT-${asset.symbol}`,
+          `PT-${asset.symbol}`,
+          `YT-${asset.symbol}`,
+          `YT-${asset.symbol}`,
         ]
       })
       
@@ -1194,7 +1163,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       console.log('📞 Calling refetchAllowance()...')
       refetchAllowance()
       
-      // 🎯 CRITICAL: Also refresh PT/YT balances after split
       if (refetchPtBalance) {
         console.log('📞 Calling refetchPtBalance()...')
         refetchPtBalance()
@@ -1210,7 +1178,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       
       console.log('✅ All refetch functions called successfully')
       
-      // Enhanced logging with multiple balance checks
       setTimeout(() => {
         console.log('📊 BALANCE CHECK 1 (1 second after refresh):', {
           asset: selectedAssetKey,
@@ -1223,7 +1190,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         })
       }, 1000)
       
-      // Additional balance check after 3 seconds
       setTimeout(() => {
         console.log('📊 BALANCE CHECK 2 (3 seconds after refresh):', {
           asset: selectedAssetKey,
@@ -1241,17 +1207,14 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // New combined function for the complete deposit and split flow
   const handleDepositAndSplit = async (amount: string): Promise<void> => {
     if (!amount || !address) return
     
     setSplitProgress({ step: 'wrapping', message: 'Starting deposit and split flow...' })
     
     try {
-      // Step 1: Wrap underlying asset to SY tokens
       console.log('🚀 STEP 1: Wrapping to SY tokens', { amount, asset: selectedAssetKey })
       
-      // Use the existing writeWrap function which will set wrapHash
       writeWrap({
         address: syAddress,
         abi: StandardizedYieldTokenABI.abi,
@@ -1262,23 +1225,18 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       setSplitProgress({ step: 'waiting', message: 'Waiting for wrap transaction to confirm...' })
       toast.success('Step 1/2: Wrapping to SY tokens...')
       
-      // Wait for wrap transaction to be mined using wagmi hooks
       if (wrapHash) {
         console.log('✅ STEP 1 COMPLETE: Wrap transaction confirmed')
         toast.success('Step 1/2: Wrap confirmed! Proceeding to split...')
         
-        // Step 2: Split SY tokens into PT + YT
         setSplitProgress({ step: 'splitting', message: 'Splitting SY tokens into PT + YT...' })
         
-        // Ensure market exists before splitting
         if (!marketData) {
           console.log('🏭 Market not found, creating market first...')
           toast.success('Creating market for PT/YT tokens...')
           await handleCreateMarket()
           
-          // Wait a bit for market creation to propagate
           await new Promise(resolve => setTimeout(resolve, 3000))
-          // Refresh market data by refetching balances
           await Promise.all([
             refetchAssetBalance(),
             refetchSyBalance()
@@ -1287,10 +1245,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         
         console.log('🎯 STEP 2: Splitting SY tokens', { amount, marketData })
         
-        // Use the existing writeSplitTokens function which will set splitHash
         const syAmount = parseEther(amount)
-        const minPTAmount = syAmount // 1:1 ratio for now
-        const minYTAmount = syAmount // 1:1 ratio for now
+        const minPTAmount = syAmount
+        const minYTAmount = syAmount
         
         writeSplitTokens({
           address: CONTRACTS.FACTORY as Address,
@@ -1302,13 +1259,11 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         setSplitProgress({ step: 'waiting', message: 'Waiting for split transaction to confirm...' })
         toast.success('Step 2/2: Splitting into PT + YT tokens...')
         
-        // Wait for split transaction to be mined using wagmi hooks
         if (splitHash) {
           console.log('🎉 STEP 2 COMPLETE: Split transaction confirmed')
           setSplitProgress({ step: 'complete', message: '🎉 Split complete! Your PT + YT tokens are ready!' })
           toast.success('🎉 Split complete! Check Portfolio tab for your tokens!')
           
-          // Refresh all balances
           await Promise.all([
             refetchAssetBalance(),
             refetchSyBalance(),
@@ -1316,7 +1271,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
             refetchYtBalance()
           ])
           
-          // Reset progress after a delay
           setTimeout(() => {
             setSplitProgress({ step: 'idle', message: '' })
           }, 5000)
@@ -1330,7 +1284,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast.error(`Split failed: ${errorMessage}`)
       
-      // Log detailed error for debugging
       console.error('Error details:', {
         message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
@@ -1342,7 +1295,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }
 
-  // ========== SUCCESS HANDLERS ==========
   useEffect(() => {
     if (isMintSuccess && mintHash) {
       toast.success(`Successfully minted 1000 ${selectedAsset.symbol}!`)
@@ -1376,7 +1328,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       })
       setTimeout(() => setNotification(null), 5000)
       
-      // 🎯 CRITICAL FIX: Reset split progress after approval to allow new operations
       setSplitProgress({ step: 'idle', message: '' })
       
       refreshBalances()
@@ -1391,13 +1342,10 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         currentSYBalance: syBalance ? formatUnits(syBalance as bigint, 18) : '0'
       })
       
-      // 🎯 ENHANCED BALANCE REFRESH: More aggressive and reliable balance updates
       console.log('🔄 REFRESHING BALANCES: Starting enhanced refresh...')
       
-      // Immediate refresh
       refreshBalances()
       
-      // Enhanced refresh with longer delays to ensure blockchain state updates
       setTimeout(() => {
         console.log('🔄 REFRESH 1: 2 seconds after wrap success')
         refreshBalances()
@@ -1419,11 +1367,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         refetchSyBalance()
       }, 10000)
       
-      // Check if this was a deposit-only operation or part of deposit+split
       const wasDepositOnly = !splitProgress.step.includes('splitting')
       
       if (wasDepositOnly) {
-        // This was just a deposit/wrap operation
         console.log('🔄 SPLIT PROGRESS STATE CHANGE:', {
           from: 'deposit_only_wrap_success',
           to: 'idle',
@@ -1440,17 +1386,14 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         })
         setTimeout(() => setNotification(null), 5000)
         
-        // Reset progress for deposit-only
         setSplitProgress({ step: 'idle', message: '' })
         
-        // Enhanced final balance check after deposit with multiple attempts
         setTimeout(() => {
           console.log('📊 DEPOSIT COMPLETE - Enhanced Final Balance Check')
           refreshBalances()
           refetchAssetBalance()
           refetchSyBalance()
           
-          // Log the updated balances
           setTimeout(() => {
             const finalAssetBalance = assetBalance ? formatUnits(assetBalance as bigint, 18) : '0'
             const finalSYBalance = syBalance ? formatUnits(syBalance as bigint, 18) : '0'
@@ -1466,7 +1409,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         }, 3000)
         
       } else {
-        // This was part of deposit+split operation
         toast.success('Step 1 complete! Now splitting into PT + YT...')
         setNotification({
           type: 'success',
@@ -1476,11 +1418,8 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         })
         setTimeout(() => setNotification(null), 5000)
         
-        // Auto-split SY tokens after successful wrap
-        // This creates the PT + YT tokens from SY
         setTimeout(() => {
           console.log('🔄 PREPARING STEP 2: About to split SY tokens...')
-          // Refresh balance first
           refetchSyBalance().then(() => {
             const currentSYBalance = formatUnits(syBalance as bigint || 0n, 18)
             console.log('📊 Current SY Balance for splitting:', currentSYBalance)
@@ -1495,7 +1434,7 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
               toast.error('No SY tokens found to split. Please try again.')
             }
           })
-        }, 3000) // Wait 3 seconds for balances to update
+        }, 3000)
       }
     }
   }, [isWrapSuccess, wrapHash, selectedAsset.symbol, syBalance, splitProgress.step])
@@ -1507,11 +1446,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
         asset: selectedAsset.symbol
       })
       
-      // 🎯 IMMEDIATE: Refresh balances to see the new PT/YT tokens
       console.log('🔄 REFRESHING BALANCES: Fetching new PT/YT balances...')
       refreshBalances()
       
-      // 🎯 FORCE MULTIPLE REFRESHES: Ensure PT/YT balances update
       setTimeout(() => refreshBalances(), 1000)
       setTimeout(() => refreshBalances(), 3000)
       setTimeout(() => refreshBalances(), 5000)
@@ -1527,7 +1464,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
           ytClaimable: finalYTClaimable
         })
         
-        // Show a summary of what was created
         if (parseFloat(finalPTBalance) > 0 && parseFloat(finalYTBalance) > 0) {
           console.log('🎉 SPLIT SUCCESS SUMMARY:', {
             message: 'PT and YT tokens successfully created!',
@@ -1537,7 +1473,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
             ratio: 'Perfect 1:1:1 split as expected from smart contract'
           })
           
-          // 🎯 SHOW VISUAL CONFIRMATION
           toast.success(`✨ MAGIC COMPLETE! Created ${finalPTBalance} PT + ${finalYTBalance} YT tokens!`)
         } else {
           console.warn('⚠️ PT/YT balances not showing yet, may need more time to update')
@@ -1576,7 +1511,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
       setTimeout(() => setNotification(null), 5000)
       refreshBalances()
       
-      // Trigger transaction history refresh
       if (window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('yieldClaimed', {
           detail: { asset: selectedAsset.symbol, hash: claimYTHash }
@@ -1651,25 +1585,20 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     }
   }, [isClaimSuccess, claimHash, selectedAsset.symbol])
 
-  // ========== RETURN VALUES ==========
-  // Manual refresh function for debugging
   const refreshAllowanceData = () => {
     console.log('🔄 Manually refreshing allowance data...')
     refetchSYAllowance()
-    // Also refresh asset allowance if available
     if (typeof refetchAllowance === 'function') {
       refetchAllowance()
     }
   }
   
-  // 🎯 NEW: Function to manually reset split progress state
   const resetSplitProgress = () => {
     console.log('🔄 MANUAL RESET: Resetting split progress state')
     setSplitProgress({ step: 'idle', message: '' })
     toast.success('Split progress reset. You can now perform new operations.')
   }
   
-  // 🎯 NEW: Function to log current system state for debugging
   const logCurrentState = () => {
     console.log('🔍 CURRENT SYSTEM STATE DEBUG:', {
       timestamp: new Date().toISOString(),
@@ -1686,11 +1615,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     })
   }
   
-  // 🎯 NEW: Function to force reset if stuck in blocking state
   const forceResetIfStuck = () => {
     console.log('🔧 FORCE RESET: Checking if system is stuck in blocking state')
     
-    // If we're in a blocking state but no transaction is pending, force reset
     if (splitProgress.step === 'wrapping' || splitProgress.step === 'waiting' || splitProgress.step === 'splitting') {
       console.warn('⚠️ SYSTEM STUCK: Force resetting from blocking state', {
         currentStep: splitProgress.step,
@@ -1708,7 +1635,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
   }
 
   return {
-    // State
     isConnected,
     address,
     notification,
@@ -1716,15 +1642,13 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     assetAddress,
     syAddress,
     
-    // Balances
     assetBalance,
     syBalance,
     coreBalance,
     accumulatedYield,
     
-    // PT/YT Token data
     marketData,
-    allMarkets: undefined, // No longer fetching all markets here
+    allMarkets: undefined,
     ptBalance,
     ytBalance,
     ytClaimableYield,
@@ -1734,7 +1658,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     ptTokenAddress: marketData ? marketData.ptToken as Address : undefined,
     ytTokenAddress: marketData ? marketData.ytToken as Address : undefined,
     
-    // Loading states
+    yieldSourceInfo,
+    realYieldAPY,
+    
     isMinting: isMintPending || isMintWaiting,
     isApproving: isApprovePending || isApproveWaiting,
     isDepositing: isWrapPending || isWrapWaiting || isSplitPending || isSplitWaiting,
@@ -1744,7 +1670,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     isRedeemingPT: isRedeemPTPending || isRedeemPTWaiting,
     isAddingYieldSnapshot: isAddYieldPending || isAddYieldWaiting,
     
-    // Helper functions
     formatBalance,
     formatYield,
     needsApproval,
@@ -1753,11 +1678,9 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     setMaxAmount,
     refreshBalances,
     
-    // Price functions
     getRealTimePrice,
     formatBalanceUSD,
     
-    // Actions
     handleMintTestTokens,
     handleMintCustomAmount,
     approveAsset,
@@ -1772,7 +1695,6 @@ export const useYieldProtocol = (selectedAssetKey: AssetKey) => {
     handleAddYieldSnapshot,
     handleDepositAndSplit,
     
-    // Split progress tracking
     splitProgress,
     refreshAllowanceData,
     refetchSYAllowance,

@@ -1,5 +1,3 @@
-// contracts/core/StandardizedYieldToken.sol
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -16,16 +14,13 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
     uint256 public maxSupply;
     uint256 public minWrapAmount;
     
-    // Yield tracking
     mapping(address => uint256) public userYieldDebt;
     mapping(address => uint256) public userLastUpdate;
     mapping(address => uint256) public userTotalYieldClaimed;
     
-    // Flash mint
     mapping(address => bool) public flashMintApproved;
-    uint256 public flashMintFee = 5; // 0.05% in basis points
+    uint256 public flashMintFee = 5;
     
-    // Events
     event YieldAccumulated(address indexed user, uint256 amount);
     event AssetWrapped(address indexed user, uint256 amount);
     event AssetUnwrapped(address indexed user, uint256 amount);
@@ -35,7 +30,6 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
     event MaxSupplyUpdated(uint256 oldMax, uint256 newMax);
     event MinWrapAmountUpdated(uint256 oldMin, uint256 newMin);
     
-    // Custom errors
     error InsufficientBalance(uint256 requested, uint256 available);
     error InvalidAmount(uint256 amount);
     error YieldRateTooHigh(uint256 rate);
@@ -54,11 +48,10 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         underlyingAsset = IERC20(_underlyingAsset);
         yieldRate = _yieldRate;
         lastGlobalUpdate = block.timestamp;
-        maxSupply = type(uint256).max; // No limit initially
-        minWrapAmount = 1e15; // 0.001 tokens minimum
+        maxSupply = type(uint256).max;
+        minWrapAmount = 1e15;
     }
     
-    // ========== CORE FUNCTIONS ==========
     
     function wrap(uint256 amount) external nonReentrant whenNotPaused returns (uint256) {
         if (amount == 0) revert InvalidAmount(amount);
@@ -99,18 +92,16 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         userYieldDebt[msg.sender] = 0;
         userTotalYieldClaimed[msg.sender] += yieldAmount;
         
-        // Mint yield as additional SY tokens
         _mint(msg.sender, yieldAmount);
         
         emit YieldAccumulated(msg.sender, yieldAmount);
         return yieldAmount;
     }
     
-    // ========== ADVANCED FEATURES ==========
     
     function batchWrap(uint256[] memory amounts, address[] memory recipients) external nonReentrant whenNotPaused {
         require(amounts.length == recipients.length, "Arrays length mismatch");
-        require(amounts.length <= 50, "Too many operations"); // Gas limit protection
+        require(amounts.length <= 50, "Too many operations");
         
         uint256 totalAmount = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
@@ -137,21 +128,16 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         uint256 fee = (amount * flashMintFee) / 10000;
         uint256 balanceBefore = balanceOf(msg.sender);
         
-        // Mint tokens temporarily
         _mint(msg.sender, amount);
         
-        // Execute callback
         (bool success, ) = msg.sender.call(data);
         require(success, "Flash mint callback failed");
         
-        // Check repayment
         uint256 balanceAfter = balanceOf(msg.sender);
         require(balanceAfter >= balanceBefore + fee, "Flash mint not repaid");
         
-        // Burn the flash minted amount
         _burn(msg.sender, amount);
         
-        // Keep the fee
         if (fee > 0) {
             _transfer(msg.sender, owner(), fee);
         }
@@ -159,7 +145,6 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         emit FlashMint(msg.sender, amount, fee);
     }
     
-    // ========== VIEW FUNCTIONS ==========
     
     function getAccumulatedYield(address user) external view returns (uint256) {
         if (balanceOf(user) == 0) return userYieldDebt[user];
@@ -215,7 +200,6 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         averageYieldPerToken = totalSupply_ > 0 ? totalYieldAccumulated_ / totalSupply_ : 0;
     }
     
-    // ========== INTERNAL FUNCTIONS ==========
     
     function _updateUserYield(address user) internal {
         if (balanceOf(user) > 0) {
@@ -229,17 +213,15 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         userLastUpdate[user] = block.timestamp;
     }
     
-    // Override _update instead of _beforeTokenTransfer for OpenZeppelin v5
     function _update(address from, address to, uint256 value) internal override {
         if (from != address(0)) _updateUserYield(from);
         if (to != address(0)) _updateUserYield(to);
         super._update(from, to, value);
     }
     
-    // ========== ADMIN FUNCTIONS ==========
     
     function setYieldRate(uint256 newRate) external onlyOwner {
-        if (newRate > 10000) revert YieldRateTooHigh(newRate); // Max 100%
+        if (newRate > 10000) revert YieldRateTooHigh(newRate);
         uint256 oldRate = yieldRate;
         yieldRate = newRate;
         emit YieldRateUpdated(oldRate, newRate);
@@ -262,7 +244,7 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
     }
     
     function setFlashMintFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 100, "Fee too high"); // Max 1%
+        require(newFee <= 100, "Fee too high");
         flashMintFee = newFee;
     }
     
@@ -279,7 +261,6 @@ contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
         IERC20(token).transfer(owner(), amount);
     }
     
-    // ========== TESTING HELPERS ==========
     
     function simulateTimePass(uint256 timeInSeconds) external {
         userLastUpdate[msg.sender] = block.timestamp - timeInSeconds;

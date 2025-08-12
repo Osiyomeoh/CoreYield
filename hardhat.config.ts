@@ -12,7 +12,7 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 200,
           },
-          viaIR: true, // Enable viaIR to handle stack too deep
+          viaIR: true,
         },
       },
       {

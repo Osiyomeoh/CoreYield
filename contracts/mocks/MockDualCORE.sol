@@ -1,12 +1,10 @@
-//contracts/mocks/MockDualCORE (Enhanced)
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MockDualCORE is ERC20, Ownable {
-    uint256 public rewardRate = 1210; // 12.1% APY
+    uint256 public rewardRate = 1210;
     uint256 public coreReserve;
     uint256 public btcReserve;
     uint256 public totalLiquidity;
@@ -34,7 +32,7 @@ contract MockDualCORE is ERC20, Ownable {
         liquidityProvided[to] += amount;
         lastLPTime[to] = block.timestamp;
         totalLiquidity += amount;
-        emit LiquidityAdded(to, amount / 2, amount / 20000, amount); // Simulate LP ratio
+        emit LiquidityAdded(to, amount / 2, amount / 20000, amount);
     }
     
     function getRewardRate() external view returns (uint256) {
@@ -61,7 +59,7 @@ contract MockDualCORE is ERC20, Ownable {
     ) {
         lpTokens = balanceOf(user);
         lpDuration = block.timestamp - lastLPTime[user];
-        shareOfPool = totalLiquidity > 0 ? (lpTokens * 10000) / totalLiquidity : 0; // In basis points
+        shareOfPool = totalLiquidity > 0 ? (lpTokens * 10000) / totalLiquidity : 0;
         estimatedRewards = (lpTokens * rewardRate * lpDuration) / (365 days * 10000);
     }
 }

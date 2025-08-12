@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -9,17 +8,15 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  * @dev Implements time value of money, yield curves, and pricing models
  */
 library LibYieldMath {
-    // Constants for precision
     uint256 public constant PRECISION = 1e18;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
-    uint256 public constant MAX_YIELD_RATE = 10000; // 100% in basis points
+    uint256 public constant MAX_YIELD_RATE = 10000;
     
-    // Yield curve structure
     struct YieldCurve {
-        uint256[] maturities;      // Array of maturity timestamps
-        uint256[] rates;           // Corresponding yield rates (basis points)
-        uint256 volatility;        // Market volatility (basis points)
-        uint256 lastUpdate;        // Last curve update timestamp
+        uint256[] maturities;
+        uint256[] rates;
+        uint256 volatility;
+        uint256 lastUpdate;
     }
     
     /**
@@ -43,13 +40,9 @@ library LibYieldMath {
         uint256 timeToMaturity = maturity - currentTime;
         uint256 annualizedTime = (timeToMaturity * PRECISION) / SECONDS_PER_YEAR;
         
-        // Calculate present value using compound interest formula
-        // PV = FV / (1 + r)^t
         uint256 yieldRateDecimal = (yieldRate * PRECISION) / 10000;
         uint256 discountFactor = PRECISION + yieldRateDecimal;
         
-        // For simplicity, we'll use a linear approximation for now
-        // In production, this would use a more sophisticated exponential function
         ptPrice = (syAmount * PRECISION) / discountFactor;
         ytPrice = syAmount - ptPrice;
         
@@ -90,7 +83,6 @@ library LibYieldMath {
         require(curve.maturities.length >= 2, "Insufficient curve points");
         require(targetMaturity > block.timestamp, "Invalid target maturity");
         
-        // Find the two closest maturity points
         uint256 lowerMaturity = 0;
         uint256 upperMaturity = type(uint256).max;
         uint256 lowerRate = 0;
@@ -107,9 +99,8 @@ library LibYieldMath {
             }
         }
         
-        // Linear interpolation
         if (upperMaturity == type(uint256).max) {
-            return lowerRate; // Extrapolate using last known rate
+            return lowerRate;
         }
         
         uint256 maturityDiff = upperMaturity - lowerMaturity;
@@ -140,7 +131,6 @@ library LibYieldMath {
         uint256 annualizedTime = (timeToMaturity * PRECISION) / SECONDS_PER_YEAR;
         uint256 volatilityAdjustment = (volatility * annualizedTime) / PRECISION;
         
-        // Volatility increases yield for longer maturities
         adjustedYield = baseYield + volatilityAdjustment;
         
         if (adjustedYield > MAX_YIELD_RATE) {
@@ -176,16 +166,13 @@ library LibYieldMath {
             yieldRate
         );
         
-        // Base ratio based on time value of money
         uint256 basePTRatio = (ptPrice * 10000) / syAmount;
         
-        // Adjust based on user risk profile
-        uint256 riskAdjustment = userRiskProfile * 100; // 0-10000 basis points
+        uint256 riskAdjustment = userRiskProfile * 100;
         
         ptRatio = basePTRatio + riskAdjustment;
         ytRatio = 10000 - ptRatio;
         
-        // Ensure ratios are within bounds
         if (ptRatio > 10000) {
             ptRatio = 10000;
             ytRatio = 0;

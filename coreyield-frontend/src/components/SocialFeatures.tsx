@@ -41,7 +41,6 @@ export const SocialFeatures: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<'stCORE' | 'lstBTC' | 'dualCORE'>('stCORE')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Mock social strategies data
   const [socialStrategies] = useState<SocialStrategy[]>([
     {
       id: '1',
@@ -87,14 +86,13 @@ export const SocialFeatures: React.FC = () => {
     }
   ])
 
-  // Mock community posts
   const [communityPosts] = useState<CommunityPost[]>([
     {
       id: '1',
       author: '0x1234...5678',
       authorAvatar: '👨‍💼',
       content: 'Just hit 15% APY on my stCORE strategy! The CoreYield protocol is really delivering. Anyone else seeing similar results?',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
       likes: 24,
       comments: 8,
       shares: 3,
@@ -106,7 +104,7 @@ export const SocialFeatures: React.FC = () => {
       author: '0x8765...4321',
       authorAvatar: '🚀',
       content: 'New yield farming strategy: combining PT and YT tokens for maximum efficiency. Riskier but the rewards are worth it!',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
       likes: 18,
       comments: 12,
       shares: 7,
@@ -118,7 +116,7 @@ export const SocialFeatures: React.FC = () => {
       author: '0x9999...8888',
       authorAvatar: '⚖️',
       content: 'What do you think about the new dualCORE market? Seems like a good opportunity for diversification.',
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
+      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
       likes: 15,
       comments: 6,
       shares: 2,
@@ -127,7 +125,6 @@ export const SocialFeatures: React.FC = () => {
     }
   ])
 
-  // Mock leaderboard data
   const [leaderboard] = useState([
     { rank: 1, address: '0x1234...5678', avatar: '👑', tvl: 125000, apy: 16.8, followers: 89 },
     { rank: 2, address: '0x8765...4321', avatar: '🥈', tvl: 98000, apy: 15.2, followers: 67 },
@@ -137,12 +134,10 @@ export const SocialFeatures: React.FC = () => {
   ])
 
   const handleFollowStrategy = (strategyId: string) => {
-    // In real implementation, this would interact with smart contracts
     console.log(`Following strategy: ${strategyId}`)
   }
 
   const handleLikePost = (postId: string) => {
-    // In real implementation, this would interact with smart contracts
     console.log(`Liked post: ${postId}`)
   }
 

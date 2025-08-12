@@ -27,24 +27,21 @@ export const Analytics: React.FC = () => {
   const [yieldData, setYieldData] = useState<YieldData[]>([])
 
 
-  // Get hooks for all assets
   const stCOREHook = useYieldProtocol('stCORE')
   const lstBTCHook = useYieldProtocol('lstBTC')
   const dualCOREHook = useYieldProtocol('dualCORE')
 
   const currentHook = selectedAsset === 'stCORE' ? stCOREHook : selectedAsset === 'lstBTC' ? lstBTCHook : dualCOREHook
 
-  // Mock protocol stats (in real implementation, fetch from contracts)
   const protocolStats: ProtocolStats = useMemo(() => ({
     totalMarkets: 3,
     activeMarkets: 3,
-    totalValueLocked: 1250000, // $1.25M
-    totalYieldDistributed: 45000, // $45K
+    totalValueLocked: 1250000,
+    totalYieldDistributed: 45000,
     averageAPY: 12.5,
     uniqueUsers: 127
   }), [])
 
-  // Generate mock yield data for demonstration
   useEffect(() => {
     const generateYieldData = () => {
       const now = Date.now()
@@ -53,14 +50,14 @@ export const Analytics: React.FC = () => {
       for (let i = 0; i < 30; i++) {
         const timestamp = now - (29 - i) * 24 * 60 * 60 * 1000
         const baseAPY = 12.5
-        const volatility = (Math.random() - 0.5) * 4 // ±2% volatility
+        const volatility = (Math.random() - 0.5) * 4
         const apy = Math.max(0, baseAPY + volatility)
         
         data.push({
           timestamp,
           apy: parseFloat(apy.toFixed(2)),
-          tvl: 1000000 + Math.random() * 500000, // $1M - $1.5M
-          volume: 50000 + Math.random() * 100000 // $50K - $150K
+          tvl: 1000000 + Math.random() * 500000,
+          volume: 50000 + Math.random() * 100000
         })
       }
       
@@ -70,7 +67,6 @@ export const Analytics: React.FC = () => {
     generateYieldData()
   }, [timeRange])
 
-  // Calculate performance metrics
   const performanceMetrics = useMemo(() => {
     if (yieldData.length === 0) return null
 
@@ -102,15 +98,14 @@ export const Analytics: React.FC = () => {
   const userPortfolio = useMemo(() => {
     if (!isConnected || !address) return null
 
-    // Ensure we have valid bigint values with explicit typing
     const syBalance: bigint = (currentHook?.syBalance as bigint) ?? 0n
     const ptBalance: bigint = (currentHook?.ptBalance as bigint) ?? 0n
     const ytBalance: bigint = (currentHook?.ytBalance as bigint) ?? 0n
     const accumulatedYield: bigint = (currentHook?.accumulatedYield as bigint) ?? 0n
 
-    const totalValue = (Number(formatUnits(syBalance, 18)) * 1) + // Assuming 1:1 ratio for demo
-                      (Number(formatUnits(ptBalance, 18)) * 0.95) + // PT slightly discounted
-                      (Number(formatUnits(ytBalance, 18)) * 0.05) // YT value from yield
+    const totalValue = (Number(formatUnits(syBalance, 18)) * 1) +
+                      (Number(formatUnits(ptBalance, 18)) * 0.95) +
+                      (Number(formatUnits(ytBalance, 18)) * 0.05)
 
     return {
       syBalance: formatUnits(syBalance, 18),
@@ -241,7 +236,7 @@ export const Analytics: React.FC = () => {
                   key={index}
                   className="flex-1 bg-gradient-to-t from-blue-500 to-blue-600 rounded-t"
                   style={{
-                    height: `${(data.apy / 20) * 100}%`, // Scale to max 20% APY
+                    height: `${(data.apy / 20) * 100}%`,
                     minHeight: '4px'
                   }}
                   title={`${data.apy}% APY on ${new Date(data.timestamp).toLocaleDateString()}`}

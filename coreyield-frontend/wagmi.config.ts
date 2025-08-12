@@ -11,7 +11,6 @@ export const coreTestnet: Chain = {
   },
   rpcUrls: {
     default: {
-      // Use proxy in development, fallback RPC URLs in production
       http: import.meta.env.DEV 
         ? ['/rpc'] 
         : [

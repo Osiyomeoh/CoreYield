@@ -30,24 +30,19 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
   onOpenMobile
 }) => {
   const menuItems: MenuItem[] = [
-    // Core Features
     { id: 'analytics', label: 'Analytics', icon: '📈', action: onOpenAnalytics },
     { id: 'social', label: 'Social Features', icon: '💬', action: onOpenSocial },
     { id: 'documentation', label: 'Documentation', icon: '📚', action: onOpenDocumentation },
     { id: 'mobile', label: 'Mobile View', icon: '📱', action: onOpenMobile },
     
-    // Divider
     { id: 'divider1', label: '', icon: '', action: () => {} },
     
-    // Tools
     { id: 'calculator', label: 'Calculator', icon: '🧮', action: onOpenCalculator },
     { id: 'info-bot', label: 'Info Bot', icon: '🤖', action: onOpenInfoBot },
     { id: 'whale-alerts', label: 'Whale Alerts', icon: '🐋', action: onOpenWhaleAlerts },
     
-    // Divider
     { id: 'divider2', label: '', icon: '', action: () => {} },
     
-    // Updates and Legal
     { id: 'latest-update', label: 'Latest Update', icon: '🆕', action: () => window.open('/updates', '_blank') },
     { id: 'privacy-policy', label: 'Privacy Policy', icon: '🔒', action: () => window.open('/privacy', '_blank') },
     { id: 'terms-of-use', label: 'Terms of Use', icon: '📋', action: () => window.open('/terms', '_blank') },

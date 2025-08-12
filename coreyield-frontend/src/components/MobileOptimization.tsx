@@ -31,7 +31,6 @@ export const MobileOptimization: React.FC = () => {
 
 
 
-  // Mobile quick actions
   const [quickActions] = useState<MobileQuickAction[]>([
     {
       id: '1',
@@ -67,7 +66,6 @@ export const MobileOptimization: React.FC = () => {
     }
   ])
 
-  // Mobile notifications
   const [notifications] = useState<MobileNotification[]>([
     {
       id: '1',
@@ -95,7 +93,6 @@ export const MobileOptimization: React.FC = () => {
     }
   ])
 
-  // Touch/swipe handling
   useEffect(() => {
     let startX = 0
     let startY = 0
@@ -112,25 +109,21 @@ export const MobileOptimization: React.FC = () => {
       const diffX = startX - endX
       const diffY = startY - endY
       
-      // Only handle horizontal swipes
       if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
         if (diffX > 0) {
           setSwipeDirection('left')
-          // Swipe left - next tab
           const tabs = ['dashboard', 'actions', 'notifications', 'settings']
           const currentIndex = tabs.indexOf(activeTab)
           const nextIndex = (currentIndex + 1) % tabs.length
           setActiveTab(tabs[nextIndex] as any)
         } else {
           setSwipeDirection('right')
-          // Swipe right - previous tab
           const tabs = ['dashboard', 'actions', 'notifications', 'settings']
           const currentIndex = tabs.indexOf(activeTab)
           const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
           setActiveTab(tabs[prevIndex] as any)
         }
         
-        // Reset swipe direction after animation
         setTimeout(() => setSwipeDirection(null), 300)
       }
     }

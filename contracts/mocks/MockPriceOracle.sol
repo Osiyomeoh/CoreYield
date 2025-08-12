@@ -1,21 +1,16 @@
-// contracts/mocks/MockPriceOracle.sol
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MockPriceOracle is Ownable {
-    // Simple price mapping for testing
     mapping(address => uint256) public tokenPrices;
     
-    // Default prices
-    uint256 public constant DEFAULT_PRICE = 1e18; // 1 USD
+    uint256 public constant DEFAULT_PRICE = 1e18;
     
     event PriceUpdated(address indexed token, uint256 oldPrice, uint256 newPrice);
     
     constructor() Ownable(msg.sender) {
-        // Set some default prices for common tokens
-        tokenPrices[address(0)] = 1e18; // ETH default
+        tokenPrices[address(0)] = 1e18;
     }
     
     function getPrice(address token) external view returns (uint256) {

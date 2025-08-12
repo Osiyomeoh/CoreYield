@@ -13,14 +13,11 @@ export const ContractTest: React.FC = () => {
     addResult('Testing contract connections...')
     
     try {
-      // Test SY-stCORE contract
       const syStCOREAddress = CONTRACTS.SY_TOKENS['SY-stCORE']
       addResult(`SY-stCORE Address: ${syStCOREAddress}`)
       
-      // Test factory contract
       addResult(`Factory Address: ${CONTRACTS.FACTORY}`)
       
-      // Test mock assets
       addResult(`Mock stCORE: ${CONTRACTS.MOCK_ASSETS.stCORE}`)
       addResult(`Mock lstBTC: ${CONTRACTS.MOCK_ASSETS.lstBTC}`)
       addResult(`Mock dualCORE: ${CONTRACTS.MOCK_ASSETS.dualCORE}`)

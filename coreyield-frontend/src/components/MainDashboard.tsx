@@ -82,6 +82,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
 
   const currentHook = selectedAsset === 'stCORE' ? stCOREHook : selectedAsset === 'lstBTC' ? lstBTCHook : dualCOREHook
 
+  // 🎯 NEW: Get real yield data from the hook
+  const { yieldSourceInfo, realYieldAPY, needsSYApproval, approveSYTokens } = currentHook
+
   // Memoize approval status to avoid repeated function calls
   const approvalStatus = React.useMemo(() => {
     if (!amount) return { needsApproval: true, status: '❌ Needs Approval', className: 'text-red-400' }
@@ -90,6 +93,17 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
       needsApproval,
       status: needsApproval ? '❌ Needs Approval' : '✅ Approved',
       className: needsApproval ? 'text-red-400' : 'text-green-400'
+    }
+  }, [amount, currentHook])
+
+  // 🎯 NEW: Check if SY approval is needed for splitting
+  const syApprovalStatus = React.useMemo(() => {
+    if (!amount) return { needsSYApproval: true, status: '❌ SY Approval Needed', className: 'text-red-400' }
+    const needsSYApproval = currentHook.needsSYApproval(amount)
+    return {
+      needsSYApproval,
+      status: needsSYApproval ? '❌ SY Approval Needed' : '✅ SY Approved',
+      className: needsSYApproval ? 'text-red-400' : 'text-green-400'
     }
   }, [amount, currentHook])
 
@@ -240,6 +254,11 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
 
   // Get paginated transactions for current page
   const paginatedTransactions = useMemo(() => {
+    console.log('📊 paginatedTransactions memo:', {
+      filteredTransactionsLength: filteredTransactions.length,
+      currentPage,
+      result: getPaginatedTransactions(filteredTransactions)
+    })
     return getPaginatedTransactions(filteredTransactions)
   }, [filteredTransactions, currentPage, getPaginatedTransactions])
 
@@ -1874,12 +1893,25 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                         <div className="space-y-3">
                           {/* Approval Status Display */}
                           <div className="p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
-                            <div className="text-sm text-gray-300 mb-2">🔐 Approval Status</div>
+                            <div className="text-sm text-gray-300 mb-2">🔐 Asset Approval Status</div>
                             <div className="text-xs">
                               <div className="flex justify-between">
                                 <span>Status:</span>
                                 <span className={approvalStatus.className}>
                                   {approvalStatus.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 🎯 NEW: SY Approval Status for Splitting */}
+                          <div className="p-3 bg-purple-700/50 border border-purple-600 rounded-lg">
+                            <div className="text-sm text-purple-300 mb-2">🎯 SY Approval Status (for Splitting)</div>
+                            <div className="text-xs">
+                              <div className="flex justify-between">
+                                <span>Status:</span>
+                                <span className={syApprovalStatus.className}>
+                                  {syApprovalStatus.status}
                                 </span>
                               </div>
                             </div>
@@ -2000,22 +2032,41 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
 
                       {/* Option 2: Split SY Tokens (if user has them) */}
                       {currentHook.syBalance && (currentHook.syBalance as bigint) > 0n && (
-                        <button
-                          onClick={() => void currentHook.splitTokens(amount)}
-                          disabled={!amount || isDepositing}
-                          className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
-                        >
-                          🎲 Split SY Tokens → PT + YT
-                        </button>
+                        <>
+                          {syApprovalStatus.needsSYApproval ? (
+                            <button
+                              onClick={() => currentHook.approveSYTokens(amount)}
+                              disabled={!amount || isDepositing}
+                              className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
+                            >
+                              🔐 Approve SY Tokens for Splitting
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => void currentHook.splitTokens(amount)}
+                              disabled={!amount || isDepositing}
+                              className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
+                            >
+                              🎲 Split SY Tokens → PT + YT
+                            </button>
+                          )}
+                        </>
                       )}
 
                       {/* Option 3: Deposit + Split (Combined) */}
                       <button
                         onClick={() => void currentHook.handleDepositAndSplit(amount)}
-                        disabled={!amount || isDepositing}
-                        className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors"
+                        disabled={!amount || isDepositing || syApprovalStatus.needsSYApproval}
+                        className={`w-full px-4 py-3 text-white rounded-lg font-semibold transition-colors ${
+                          syApprovalStatus.needsSYApproval 
+                            ? 'bg-gray-600 cursor-not-allowed' 
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
                       >
-                        {isDepositing ? '🚀 Processing...' : '🚀 Deposit + Split → PT + YT (2 Steps)'}
+                        {isDepositing ? '🚀 Processing...' : 
+                         syApprovalStatus.needsSYApproval ? '⚠️ Approve SY Tokens First' :
+                         '🚀 Deposit + Split → PT + YT (2 Steps)'
+                        }
                       </button>
 
                                       {/* Help text */}
@@ -2042,6 +2093,40 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
                     </div>
                   </div>
                 </div>
+                
+                {/* 🎯 NEW: Real Yield Sources Display */}
+                {yieldSourceInfo && (
+                  <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <div className="text-green-400 font-semibold mb-3">🎯 Real Yield Sources</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 bg-green-600/20 rounded border border-green-500/50">
+                        <div className="text-sm text-green-300 font-medium">stCORE Yield Source</div>
+                        <div className="text-xs text-green-200">
+                          <strong>Protocol:</strong> {yieldSourceInfo[1] || 'Loading...'}
+                        </div>
+                        <div className="text-xs text-green-200">
+                          <strong>Contract:</strong> {yieldSourceInfo[0] ? `${yieldSourceInfo[0].slice(0, 6)}...${yieldSourceInfo[0].slice(-4)}` : 'Loading...'}
+                        </div>
+                        <div className="text-xs text-green-200">
+                          <strong>APY:</strong> {realYieldAPY ? `${Number(realYieldAPY) / 100}%` : 'Loading...'}
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 bg-blue-600/20 rounded border border-blue-500/50">
+                        <div className="text-sm text-blue-300 font-medium">Real Yield Generation</div>
+                        <div className="text-xs text-blue-200">
+                          <strong>Source:</strong> Smart Contract
+                        </div>
+                        <div className="text-xs text-blue-200">
+                          <strong>Type:</strong> Actual Yield
+                        </div>
+                        <div className="text-xs text-blue-200">
+                          <strong>Status:</strong> Active
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                     </div>
                     
                                           {(isDepositing || currentHook.splitProgress.step !== 'idle') && (

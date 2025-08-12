@@ -23,13 +23,19 @@ export const useTransactionHistory = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [lastFetchedBlock, setLastFetchedBlock] = useState<number>(0)
   
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [transactionsPerPage] = useState(10)
 
-  // Fetch real transactions from blockchain events
   const fetchBlockchainTransactions = async (fromBlock: number, toBlock: number) => {
-    if (!publicClient || !address) return []
+    console.log('🚀 fetchBlockchainTransactions called with:', { fromBlock, toBlock })
+    
+    if (!publicClient || !address) {
+      console.log('❌ fetchBlockchainTransactions: Missing requirements', {
+        hasPublicClient: !!publicClient,
+        hasAddress: !!address
+      })
+      return []
+    }
 
     try {
       console.log(`🔍 Fetching transactions from block ${fromBlock} to ${toBlock}`)
@@ -38,7 +44,6 @@ export const useTransactionHistory = () => {
       
       const newTransactions: Transaction[] = []
 
-      // 1. Fetch TokensSplit events (when users split SY tokens into PT/YT)
       const splitEvents = await publicClient.getLogs({
         address: CONTRACTS.FACTORY as Address,
         event: {
@@ -57,7 +62,6 @@ export const useTransactionHistory = () => {
         toBlock: BigInt(toBlock)
       })
 
-      // Process split events
       for (const event of splitEvents) {
         if (!event.args?.syToken || !event.args?.user || !event.args?.syAmount || 
             !event.args?.ptAmount || !event.args?.ytAmount) continue
@@ -81,7 +85,6 @@ export const useTransactionHistory = () => {
         }
       }
 
-      // 2. Fetch YieldClaimed events (when users claim yield from YT tokens)
       console.log('🎯 SEARCHING FOR YIELD CLAIMED EVENTS...')
       console.log(`📍 Contract Address: ${CONTRACTS.FACTORY}`)
       console.log(`🔢 Block Range: ${fromBlock} to ${toBlock}`)
@@ -111,7 +114,6 @@ export const useTransactionHistory = () => {
         console.log('   - Network connection issues')
         console.log('   - Event signature might be wrong')
         
-        // Let's also try to fetch ALL events from the contract to see what's there
         try {
           const allEvents = await publicClient.getLogs({
             address: CONTRACTS.FACTORY as Address,
@@ -131,7 +133,6 @@ export const useTransactionHistory = () => {
         }
       }
 
-      // Process claim events
       for (const event of claimEvents) {
         if (!event.args?.syToken || !event.args?.user || !event.args?.amount) {
           console.log('⚠️ Skipping claim event with missing args:', event)
@@ -178,7 +179,6 @@ export const useTransactionHistory = () => {
         }
       }
 
-      // 3. Fetch Transfer events from SY tokens (deposits/wrapping)
       const syTokens = Object.values(CONTRACTS.SY_TOKENS || {})
       
       for (const syTokenAddress of syTokens) {
@@ -199,11 +199,9 @@ export const useTransactionHistory = () => {
           toBlock: BigInt(toBlock)
         })
 
-        // Process transfer events
         for (const event of transferEvents) {
           if (!event.args?.from || !event.args?.to || !event.args?.value) continue
           
-          // Check if this is a deposit (from user to contract) or withdrawal (from contract to user)
           const isDeposit = event.args.from === address && event.args.to === CONTRACTS.FACTORY
           const isWithdrawal = event.args.from === CONTRACTS.FACTORY && event.args.to === address
           
@@ -243,7 +241,6 @@ export const useTransactionHistory = () => {
     }
   }
 
-  // Helper function to get asset key from SY token address
   const getAssetKeyFromSYToken = (syTokenAddress: string): string | null => {
     if (!CONTRACTS.SY_TOKENS) return null
     
@@ -265,7 +262,6 @@ export const useTransactionHistory = () => {
     return null
   }
 
-  // Helper function to format units
   const formatUnits = (value: bigint, decimals: number): string => {
     try {
       return (Number(value) / Math.pow(10, decimals)).toFixed(6)
@@ -274,37 +270,53 @@ export const useTransactionHistory = () => {
     }
   }
 
-  // Fetch initial transaction history
   useEffect(() => {
     const fetchInitialHistory = async () => {
+      console.log('🔄 Transaction History Hook: Starting fetch...', {
+        isConnected,
+        address,
+        hasPublicClient: !!publicClient
+      })
+      
       if (!isConnected || !address || !publicClient) {
+        console.log('❌ Transaction History Hook: Missing requirements', {
+          isConnected,
+          address,
+          hasPublicClient: !!publicClient
+        })
         setTransactions([])
         return
       }
 
       setIsLoading(true)
+      console.log('✅ Transaction History Hook: All requirements met, fetching...')
       
       try {
-        // Get current block number
+        console.log('📞 Getting current block number...')
         const currentBlock = await publicClient.getBlockNumber()
-        const fromBlock = Math.max(0, Number(currentBlock) - 10000) // Last 10k blocks
+        const fromBlock = Math.max(0, Number(currentBlock) - 10000)
+        
+        console.log(`🔍 Block range: ${fromBlock} to ${currentBlock}`)
+        console.log('📞 Calling fetchBlockchainTransactions...')
         
         const newTransactions = await fetchBlockchainTransactions(fromBlock, Number(currentBlock))
+        
+        console.log(`✅ fetchBlockchainTransactions returned ${newTransactions.length} transactions:`, newTransactions)
         
         setTransactions(newTransactions)
         setLastFetchedBlock(Number(currentBlock))
       } catch (error) {
-        console.error('Error fetching initial history:', error)
+        console.error('❌ Error fetching initial history:', error)
         setTransactions([])
       } finally {
         setIsLoading(false)
+        console.log('🏁 Transaction History Hook: Fetch complete')
       }
     }
 
     fetchInitialHistory()
   }, [isConnected, address, publicClient])
 
-  // Listen for yield claim events to auto-refresh
   useEffect(() => {
     const handleYieldClaimed = (event: CustomEvent) => {
       console.log('🔄 Auto-refreshing transaction history after yield claim:', event.detail)
@@ -318,7 +330,6 @@ export const useTransactionHistory = () => {
     }
   }, [])
 
-  // Filter transactions by type and sort by timestamp (newest first)
   const filterTransactions = (type?: string) => {
     let filtered = transactions
     
@@ -326,23 +337,19 @@ export const useTransactionHistory = () => {
       filtered = transactions.filter(tx => tx.type === type)
     }
     
-    // Sort by timestamp: newest first
     return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
-  // Get paginated transactions for current page
   const getPaginatedTransactions = (filteredTxs: Transaction[]) => {
     const startIndex = (currentPage - 1) * transactionsPerPage
     const endIndex = startIndex + transactionsPerPage
     return filteredTxs.slice(startIndex, endIndex)
   }
 
-  // Get total pages for pagination
   const getTotalPages = (filteredTxs: Transaction[]) => {
     return Math.ceil(filteredTxs.length / transactionsPerPage)
   }
 
-  // Navigation functions
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, getTotalPages(transactions))))
   }
@@ -363,7 +370,6 @@ export const useTransactionHistory = () => {
   const goToFirstPage = () => setCurrentPage(1)
   const goToLastPage = () => setCurrentPage(getTotalPages(transactions))
 
-  // Search transactions by query and sort by timestamp (newest first)
   const searchTransactions = (query: string) => {
     if (!query.trim()) return transactions
     
@@ -375,11 +381,9 @@ export const useTransactionHistory = () => {
       tx.type.toLowerCase().includes(lowerQuery)
     )
     
-    // Sort by timestamp: newest first
     return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
-  // Get transaction statistics
   const getTransactionStats = () => {
     const total = transactions.length
     const successful = transactions.filter(tx => tx.status === 'success').length
@@ -395,7 +399,6 @@ export const useTransactionHistory = () => {
       return acc
     }, {} as Record<string, number>)
 
-    // Enhanced debugging for yield claiming
     const claimTransactions = transactions.filter(tx => tx.type === 'claim')
     console.log('🎯 YIELD CLAIMING DEBUG:', {
       totalClaimTransactions: claimTransactions.length,
@@ -426,7 +429,6 @@ export const useTransactionHistory = () => {
     }
   }
 
-  // Refresh transactions (fetch latest blocks)
   const refreshTransactions = async () => {
     if (!isConnected || !address || !publicClient) return
     
@@ -452,7 +454,6 @@ export const useTransactionHistory = () => {
     }
   }
 
-  // Manual function to search for recent yield claimed events
   const searchRecentYieldClaims = async () => {
     if (!publicClient || !address) return
     
@@ -460,7 +461,7 @@ export const useTransactionHistory = () => {
       console.log('🔍 MANUALLY SEARCHING FOR RECENT YIELD CLAIMS...')
       
       const currentBlock = await publicClient.getBlockNumber()
-      const fromBlock = Number(currentBlock) - 1000 // Search last 1000 blocks
+      const fromBlock = Number(currentBlock) - 1000
       
       console.log(`🔢 Searching blocks ${fromBlock} to ${currentBlock}`)
       
@@ -490,7 +491,6 @@ export const useTransactionHistory = () => {
         })
       }
       
-      // Also check if any events are for the current user
       const userClaimEvents = recentClaimEvents.filter(event => 
         event.args?.user === address
       )
@@ -510,7 +510,6 @@ export const useTransactionHistory = () => {
     getTransactionStats,
     refreshTransactions,
     searchRecentYieldClaims,
-    // Pagination
     currentPage,
     setCurrentPage,
     transactionsPerPage,

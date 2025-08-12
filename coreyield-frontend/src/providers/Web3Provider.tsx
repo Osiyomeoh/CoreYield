@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 
-// Core Testnet chain
 const coreTestnet = {
   id: 1114,
   name: 'Core Testnet',
@@ -24,10 +23,9 @@ const coreTestnet = {
   testnet: true,
 } as const
 
-// Simple config without custom theme
 const config = getDefaultConfig({
   appName: 'CoreYield Protocol',
-  projectId: 'c4f79cc821944d9680842e34466bfabc', // Public demo project ID
+  projectId: 'c4f79cc821944d9680842e34466bfabc',
   chains: [coreTestnet],
   ssr: false,
 })

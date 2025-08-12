@@ -1,10 +1,8 @@
-// test/TokenContracts.test.ts
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
-// Fix: Use ethers v6 syntax
 const parseEther = ethers.parseEther;
 const formatEther = ethers.formatEther;
 
@@ -17,14 +15,12 @@ import {
 } from "../typechain-types";
 
 describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
-  // Contract instances
   let mockStCORE: MockStCORE;
   let syStCORE: StandardizedYieldToken;
   let coreYieldFactory: CoreYieldFactory;
   let ptToken: CorePrincipalToken;
   let ytToken: CoreYieldToken;
   
-  // Signers
   let owner: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -69,10 +65,9 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should create market and deploy PT/YT tokens", async function () {
-      // Create a market to get PT and YT tokens
       const tx = await coreYieldFactory.createMarket(
-        await syStCORE.getAddress(), // Use SY token address, not mock token
-        365 * 24 * 60 * 60, // 1 year
+        await syStCORE.getAddress(),
+        365 * 24 * 60 * 60,
         "PT-stCORE",
         "PT-stCORE",
         "YT-stCORE",
@@ -82,7 +77,6 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
       );
       
       const receipt = await tx.wait();
-      // Fix: Use parseLog instead of getEventTopic
       const event = receipt?.logs.find(log => {
         try {
           const parsed = coreYieldFactory.interface.parseLog(log);
@@ -94,10 +88,9 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
       
       expect(event).to.not.be.undefined;
       
-      // Get the deployed token addresses from the event
       const eventData = coreYieldFactory.interface.parseLog(event!);
-      const ptTokenAddress = eventData?.args[1]; // PT token address
-      const ytTokenAddress = eventData?.args[2]; // YT token address
+      const ptTokenAddress = eventData?.args[1];
+      const ytTokenAddress = eventData?.args[2];
       
       ptToken = await ethers.getContractAt("CorePrincipalToken", ptTokenAddress);
       ytToken = await ethers.getContractAt("CoreYieldToken", ytTokenAddress);
@@ -170,16 +163,13 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should handle multiple users correctly", async function () {
-      // Mint to user2
       await ptToken.mint(user2.address, parseEther("200"));
       expect(await ptToken.balanceOf(user2.address)).to.equal(parseEther("200"));
       
-      // Mint to user3
       await ptToken.mint(user3.address, parseEther("150"));
       expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("150"));
       
-      // Check total supply
-      expect(await ptToken.totalSupply()).to.equal(parseEther("400")); // 50 + 200 + 150
+      expect(await ptToken.totalSupply()).to.equal(parseEther("400"));
       console.log("✅ Multiple users handling successful");
     });
 
@@ -187,12 +177,10 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
       const initialTotalSupply = await ptToken.totalSupply();
       const initialUser1Balance = await ptToken.balanceOf(user1.address);
       
-      // Mint more tokens
       await ptToken.mint(user1.address, parseEther("100"));
       expect(await ptToken.totalSupply()).to.equal(initialTotalSupply + parseEther("100"));
       expect(await ptToken.balanceOf(user1.address)).to.equal(initialUser1Balance + parseEther("100"));
       
-      // Burn some tokens
       await ptToken.burn(user1.address, parseEther("25"));
       expect(await ptToken.totalSupply()).to.equal(initialTotalSupply + parseEther("75"));
       expect(await ptToken.balanceOf(user1.address)).to.equal(initialUser1Balance + parseEther("75"));
@@ -265,16 +253,13 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should handle multiple users correctly", async function () {
-      // Mint to user2
       await ytToken.mint(user2.address, parseEther("200"));
       expect(await ytToken.balanceOf(user2.address)).to.equal(parseEther("200"));
       
-      // Mint to user3
       await ytToken.mint(user3.address, parseEther("150"));
       expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("150"));
       
-      // Check total supply
-      expect(await ytToken.totalSupply()).to.equal(parseEther("400")); // 50 + 200 + 150
+      expect(await ytToken.totalSupply()).to.equal(parseEther("400"));
       console.log("✅ Multiple users handling successful");
     });
 
@@ -282,12 +267,10 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
       const initialTotalSupply = await ytToken.totalSupply();
       const initialUser1Balance = await ytToken.balanceOf(user1.address);
       
-      // Mint more tokens
       await ytToken.mint(user1.address, parseEther("100"));
       expect(await ytToken.totalSupply()).to.equal(initialTotalSupply + parseEther("100"));
       expect(await ytToken.balanceOf(user1.address)).to.equal(initialUser1Balance + parseEther("100"));
       
-      // Burn some tokens
       await ytToken.burn(user1.address, parseEther("25"));
       expect(await ytToken.totalSupply()).to.equal(initialTotalSupply + parseEther("75"));
       expect(await ytToken.balanceOf(user1.address)).to.equal(initialUser1Balance + parseEther("75"));
@@ -298,15 +281,13 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
 
   describe("🔄 Token Integration Tests", function () {
     it("Should handle token transfers between users", async function () {
-      // User1 transfers PT tokens to user2
       await ptToken.connect(user1).transfer(user2.address, parseEther("25"));
-      expect(await ptToken.balanceOf(user1.address)).to.equal(parseEther("25")); // 50 - 25
-      expect(await ptToken.balanceOf(user2.address)).to.equal(parseEther("225")); // 200 + 25
+      expect(await ptToken.balanceOf(user1.address)).to.equal(parseEther("25"));
+      expect(await ptToken.balanceOf(user2.address)).to.equal(parseEther("225"));
       
-      // User2 transfers YT tokens to user3
       await ytToken.connect(user2).transfer(user3.address, parseEther("50"));
-      expect(await ytToken.balanceOf(user2.address)).to.equal(parseEther("150")); // 200 - 50
-      expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("200")); // 150 + 50
+      expect(await ytToken.balanceOf(user2.address)).to.equal(parseEther("150"));
+      expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("200"));
       
       console.log("✅ Token transfers successful");
     });
@@ -324,15 +305,13 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should handle approval and transferFrom correctly", async function () {
-      // User1 approves user2 to spend PT tokens
       await ptToken.connect(user1).approve(user2.address, parseEther("50"));
       expect(await ptToken.allowance(user1.address, user2.address)).to.equal(parseEther("50"));
       
-      // User2 transfers PT tokens from user1
       await ptToken.connect(user2).transferFrom(user1.address, user3.address, parseEther("25"));
-      expect(await ptToken.balanceOf(user1.address)).to.equal(0); // 25 - 25
-      expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("225")); // 200 + 25
-      expect(await ptToken.allowance(user1.address, user2.address)).to.equal(parseEther("25")); // 50 - 25
+      expect(await ptToken.balanceOf(user1.address)).to.equal(0);
+      expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("225"));
+      expect(await ptToken.allowance(user1.address, user2.address)).to.equal(parseEther("25"));
       
       console.log("✅ Approval and transferFrom successful");
     });
@@ -346,7 +325,6 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should reject transferFrom with insufficient balance", async function () {
-      // User1 has 0 balance now, so any transfer should fail
       await expect(
         ptToken.connect(user2).transferFrom(user1.address, user3.address, parseEther("1"))
       ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
@@ -375,11 +353,9 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should allow ownership transfer from owner", async function () {
-      // Transfer PT token ownership to user1
       await ptToken.transferOwnership(user1.address);
       expect(await ptToken.owner()).to.equal(user1.address);
       
-      // Transfer YT token ownership to user2
       await ytToken.transferOwnership(user2.address);
       expect(await ytToken.owner()).to.equal(user2.address);
       
@@ -387,13 +363,11 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should allow new owner to mint/burn tokens", async function () {
-      // User1 (new PT owner) can now mint
       await ptToken.connect(user1).mint(user3.address, parseEther("100"));
-      expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("325")); // 225 + 100
+      expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("325"));
       
-      // User2 (new YT owner) can now mint
       await ytToken.connect(user2).mint(user3.address, parseEther("100"));
-      expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("300")); // 200 + 100
+      expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("300"));
       
       console.log("✅ New owner permissions working");
     });
@@ -413,7 +387,6 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should return correct balances and allowances", async function () {
-      // Check balances
       expect(await ptToken.balanceOf(user1.address)).to.equal(0);
       expect(await ptToken.balanceOf(user2.address)).to.equal(parseEther("200"));
       expect(await ptToken.balanceOf(user3.address)).to.equal(parseEther("325"));
@@ -422,15 +395,14 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
       expect(await ytToken.balanceOf(user2.address)).to.equal(parseEther("150"));
       expect(await ytToken.balanceOf(user3.address)).to.equal(parseEther("300"));
       
-      // Check allowances
       expect(await ptToken.allowance(user1.address, user2.address)).to.equal(parseEther("25"));
       
       console.log("✅ Balances and allowances correct");
     });
 
     it("Should return correct total supply", async function () {
-      expect(await ptToken.totalSupply()).to.equal(parseEther("525")); // 0 + 200 + 325
-      expect(await ytToken.totalSupply()).to.equal(parseEther("500")); // 50 + 150 + 300
+      expect(await ptToken.totalSupply()).to.equal(parseEther("525"));
+      expect(await ytToken.totalSupply()).to.equal(parseEther("500"));
       
       console.log("✅ Total supply correct");
     });
@@ -438,7 +410,6 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
 
   describe("🚨 Edge Cases & Error Handling", function () {
     it("Should handle zero address operations gracefully", async function () {
-      // Try to transfer to zero address
       await expect(
         ptToken.connect(user2).transfer(ethers.ZeroAddress, parseEther("1"))
       ).to.be.revertedWith("ERC20: transfer to the zero address");
@@ -453,10 +424,8 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     it("Should handle self-transfer correctly", async function () {
       const initialBalance = await ptToken.balanceOf(user2.address);
       
-      // User2 transfers to themselves
       await ptToken.connect(user2).transfer(user2.address, parseEther("10"));
       
-      // Balance should remain the same
       expect(await ptToken.balanceOf(user2.address)).to.equal(initialBalance);
       
       console.log("✅ Self-transfer handling correct");
@@ -475,11 +444,9 @@ describe("🪙 Token Contracts - Comprehensive Test Suite", function () {
     });
 
     it("Should handle allowance updates correctly", async function () {
-      // Increase allowance
       await ptToken.connect(user2).approve(user3.address, parseEther("100"));
       expect(await ptToken.allowance(user2.address, user3.address)).to.equal(parseEther("100"));
       
-      // Decrease allowance
       await ptToken.connect(user2).approve(user3.address, parseEther("50"));
       expect(await ptToken.allowance(user2.address, user3.address)).to.equal(parseEther("50"));
       

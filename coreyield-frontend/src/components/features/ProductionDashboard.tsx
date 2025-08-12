@@ -25,7 +25,6 @@ const ProductionDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   
-  // Production data with state for real-time updates
   const [markets, setMarkets] = useState([
     { id: 'stCORE-30D', name: 'Staked CORE 30 Day', apy: 8.5, tvl: '1250000', users: 156, change24h: 0.8 },
     { id: 'lstBTC-90D', name: 'Liquid Staked BTC 90 Day', apy: 12.2, tvl: '890000', users: 89, change24h: 1.2 },
@@ -41,16 +40,13 @@ const ProductionDashboard: React.FC = () => {
     change7d: 8.2
   })
 
-  // Simulate real-time data updates
   const updateData = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
       
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Simulate real-time data changes
       setMarkets(prev => prev.map(market => ({
         ...market,
         apy: market.apy + (Math.random() - 0.5) * 0.2,
@@ -72,15 +68,13 @@ const ProductionDashboard: React.FC = () => {
     }
   }, [])
 
-  // Auto-refresh effect
   useEffect(() => {
     if (!autoRefresh) return
     
-    const interval = setInterval(updateData, 30000) // Refresh every 30 seconds
+    const interval = setInterval(updateData, 30000)
     return () => clearInterval(interval)
   }, [autoRefresh, updateData])
 
-  // Initial data load
   useEffect(() => {
     updateData()
   }, [updateData])

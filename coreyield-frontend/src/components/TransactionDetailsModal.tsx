@@ -125,7 +125,6 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
           <button
             onClick={() => {
               navigator.clipboard.writeText(transaction.txHash)
-              // You could add a toast notification here
             }}
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
           >

@@ -74,7 +74,6 @@ export const Calculator: React.FC<CalculatorProps> = ({ onClose }) => {
                  activeTab === 'yield' ? calculateYield() : 
                  calculateCompound()
 
-  // Type guards for better TypeScript support
   const isAPYResult = (result: any): result is { principal: number; interest: number; total: number; effectiveAPY: number } => {
     return result && 'effectiveAPY' in result
   }

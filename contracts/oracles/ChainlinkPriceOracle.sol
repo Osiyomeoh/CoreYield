@@ -1,10 +1,7 @@
-// contracts/oracles/ChainlinkPriceOracle.sol
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// Custom Chainlink AggregatorV3Interface to avoid external dependencies
 interface AggregatorV3Interface {
     function latestRoundData() external view returns (
         uint80 roundId,
@@ -20,20 +17,15 @@ interface AggregatorV3Interface {
 }
 
 contract ChainlinkPriceOracle is Ownable {
-    // Chainlink price feed addresses
     mapping(address => address) public priceFeeds;
     mapping(address => uint8) public priceDecimals;
     
-    // Fallback prices for tokens without Chainlink feeds
     mapping(address => uint256) public fallbackPrices;
     
-    // Events
     event PriceFeedUpdated(address indexed token, address indexed feed, uint8 decimals);
     event FallbackPriceUpdated(address indexed token, uint256 oldPrice, uint256 newPrice);
     
     constructor() Ownable(msg.sender) {
-        // Initialize with default settings
-        // Price feeds will be set by admin after deployment
     }
     
     /**
@@ -48,15 +40,13 @@ contract ChainlinkPriceOracle is Ownable {
             try this._getChainlinkPrice(feed, priceDecimals[token]) returns (uint256 chainlinkPrice) {
                 return chainlinkPrice;
             } catch {
-                // Fallback to stored price if Chainlink fails
                 return fallbackPrices[token];
             }
         }
         
-        // Return fallback price or default
         uint256 fallbackPrice = fallbackPrices[token];
         if (fallbackPrice == 0) {
-            fallbackPrice = 1e18; // Default 1 USD
+            fallbackPrice = 1e18;
         }
         return fallbackPrice;
     }
@@ -89,7 +79,6 @@ contract ChainlinkPriceOracle is Ownable {
         
         require(price > 0, "Invalid price from Chainlink");
         
-        // Convert to 18 decimals
         if (decimals < 18) {
             return uint256(price) * (10 ** (18 - decimals));
         } else if (decimals > 18) {

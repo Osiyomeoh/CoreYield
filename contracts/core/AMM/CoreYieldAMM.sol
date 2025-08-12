@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,41 +17,37 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
     
-    // AMM pool structure
     struct Pool {
-        address syToken;           // Standardized Yield token
-        address ptToken;           // Principal Token
-        address ytToken;           // Yield Token
-        uint256 ptReserves;        // PT token reserves
-        uint256 ytReserves;        // YT token reserves
-        uint256 totalLiquidity;    // Total liquidity tokens
-        uint256 lastUpdate;        // Last update timestamp
-        bool active;               // Pool status
+        address syToken;
+        address ptToken;
+        address ytToken;
+        uint256 ptReserves;
+        uint256 ytReserves;
+        uint256 totalLiquidity;
+        uint256 lastUpdate;
+        bool active;
     }
     
-    // User liquidity position
     struct LiquidityPosition {
-        uint256 liquidity;         // User's liquidity tokens
-        uint256 ptAmount;          // PT tokens in position
-        uint256 ytAmount;          // YT tokens in position
-        uint256 lastClaim;         // Last fee claim timestamp
+        uint256 liquidity;
+        uint256 ptAmount;
+        uint256 ytAmount;
+        uint256 lastClaim;
     }
     
-    // Events
     event PoolCreated(address indexed syToken, address indexed ptToken, address indexed ytToken);
     event LiquidityAdded(address indexed user, address indexed syToken, uint256 ptAmount, uint256 ytAmount, uint256 liquidity);
     event LiquidityRemoved(address indexed user, address indexed syToken, uint256 ptAmount, uint256 ytAmount, uint256 liquidity);
     event SwapExecuted(address indexed user, address indexed syToken, bool ptToYt, uint256 amountIn, uint256 amountOut, uint256 fee);
     event FeesCollected(address indexed syToken, uint256 ptFees, uint256 ytFees);
     
-    // State variables
     mapping(address => Pool) public pools;
     mapping(address => mapping(address => LiquidityPosition)) public userPositions;
     mapping(address => bool) public supportedSYTokens;
     
     uint256 public constant FEE_DENOMINATOR = 10000;
-    uint256 public swapFee = 30; // 0.3% swap fee
-    uint256 public protocolFee = 10; // 0.1% protocol fee
+    uint256 public swapFee = 30;
+    uint256 public protocolFee = 10;
     address public feeRecipient;
     
     ICoreYieldFactory public immutable coreYieldFactory;
@@ -83,7 +78,6 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         ICoreYieldFactory.Market memory market = coreYieldFactory.getMarket(syToken);
         require(market.active, "Market not active");
         
-        // Create pool
         pools[syToken] = Pool({
             syToken: syToken,
             ptToken: market.ptToken,
@@ -97,7 +91,6 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         
         supportedSYTokens[syToken] = true;
         
-        // Transfer initial tokens from owner
         IERC20(market.ptToken).safeTransferFrom(msg.sender, address(this), initialPTAmount);
         IERC20(market.ytToken).safeTransferFrom(msg.sender, address(this), initialYTAmount);
         
@@ -121,15 +114,12 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         require(pool.active, "Pool not active");
         require(ptAmount > 0 && ytAmount > 0, "Invalid amounts");
         
-        // Calculate liquidity tokens to mint
         uint256 ptReserves = pool.ptReserves;
         uint256 ytReserves = pool.ytReserves;
         
         if (pool.totalLiquidity == 0) {
-            // First liquidity provider
             liquidity = Math.sqrt(ptAmount * ytAmount);
         } else {
-            // Calculate liquidity based on current reserves
             uint256 liquidityPT = (ptAmount * pool.totalLiquidity) / ptReserves;
             uint256 liquidityYT = (ytAmount * pool.totalLiquidity) / ytReserves;
             liquidity = Math.min(liquidityPT, liquidityYT);
@@ -137,20 +127,17 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         
         require(liquidity >= minLiquidity, "Insufficient liquidity");
         
-        // Update pool reserves
         pool.ptReserves += ptAmount;
         pool.ytReserves += ytAmount;
         pool.totalLiquidity += liquidity;
         pool.lastUpdate = block.timestamp;
         
-        // Update user position
         LiquidityPosition storage position = userPositions[syToken][msg.sender];
         position.liquidity += liquidity;
         position.ptAmount += ptAmount;
         position.ytAmount += ytAmount;
         position.lastClaim = block.timestamp;
         
-        // Transfer tokens from user
         IERC20(pool.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount);
         IERC20(pool.ytToken).safeTransferFrom(msg.sender, address(this), ytAmount);
         
@@ -176,25 +163,21 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         LiquidityPosition storage position = userPositions[syToken][msg.sender];
         require(position.liquidity >= liquidity, "Insufficient liquidity");
         
-        // Calculate token amounts to return
         ptAmount = (liquidity * pool.ptReserves) / pool.totalLiquidity;
         ytAmount = (liquidity * pool.ytReserves) / pool.totalLiquidity;
         
         require(ptAmount >= minPTAmount, "Insufficient PT amount");
         require(ytAmount >= minYTAmount, "Insufficient YT amount");
         
-        // Update pool reserves
         pool.ptReserves -= ptAmount;
         pool.ytReserves -= ytAmount;
         pool.totalLiquidity -= liquidity;
         pool.lastUpdate = block.timestamp;
         
-        // Update user position
         position.liquidity -= liquidity;
         position.ptAmount -= ptAmount;
         position.ytAmount -= ytAmount;
         
-        // Transfer tokens to user
         IERC20(pool.ptToken).safeTransfer(msg.sender, ptAmount);
         IERC20(pool.ytToken).safeTransfer(msg.sender, ytAmount);
         
@@ -253,21 +236,17 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         Pool storage pool = pools[syToken];
         require(pool.active, "Pool not active");
         
-        // Calculate output amount using constant product formula
         uint256 inputReserve = ptToYt ? pool.ptReserves : pool.ytReserves;
         uint256 outputReserve = ptToYt ? pool.ytReserves : pool.ptReserves;
         
-        // Calculate fee
         uint256 feeAmount = (amountIn * swapFee) / FEE_DENOMINATOR;
         uint256 amountInAfterFee = amountIn - feeAmount;
         
-        // Calculate output using constant product formula: (x + dx) * (y - dy) = k
         amountOut = (amountInAfterFee * outputReserve) / (inputReserve + amountInAfterFee);
         
         require(amountOut >= minAmountOut, "Insufficient output amount");
         require(amountOut < outputReserve, "Insufficient liquidity");
         
-        // Update reserves
         if (ptToYt) {
             pool.ptReserves += amountIn;
             pool.ytReserves -= amountOut;
@@ -278,7 +257,6 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
         
         pool.lastUpdate = block.timestamp;
         
-        // Transfer tokens
         address inputToken = ptToYt ? pool.ptToken : pool.ytToken;
         address outputToken = ptToYt ? pool.ytToken : pool.ptToken;
         
@@ -325,7 +303,7 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
      * @param newFee New swap fee in basis points
      */
     function updateSwapFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 500, "Fee too high"); // Max 5%
+        require(newFee <= 500, "Fee too high");
         swapFee = newFee;
     }
     
@@ -334,7 +312,7 @@ contract CoreYieldAMM is Ownable, ReentrancyGuard {
      * @param newFee New protocol fee in basis points
      */
     function updateProtocolFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 100, "Fee too high"); // Max 1%
+        require(newFee <= 100, "Fee too high");
         protocolFee = newFee;
     }
     

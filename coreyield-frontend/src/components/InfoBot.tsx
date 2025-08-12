@@ -193,14 +193,12 @@ SY tokens are ERC-20 tokens that represent your yield-bearing position in the Co
   const generateBotResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase()
     
-    // Check for exact matches first
     for (const [key, response] of Object.entries(botResponses)) {
       if (lowerMessage.includes(key)) {
         return response
       }
     }
     
-    // Check for partial matches
     if (lowerMessage.includes('apy') || lowerMessage.includes('yield')) {
       return botResponses['how do i calculate my yield earnings']
     }
@@ -217,7 +215,6 @@ SY tokens are ERC-20 tokens that represent your yield-bearing position in the Co
       return botResponses['what are sy tokens']
     }
     
-    // Default response
     return `I understand you're asking about "${userMessage}". Let me help you with that!
 
 For specific questions about CoreYield, try asking about:
@@ -245,7 +242,6 @@ Or use the quick questions below for instant answers!`
     setInputValue('')
     setIsTyping(true)
 
-    // Simulate typing delay
     setTimeout(() => {
       const botResponse = generateBotResponse(content)
       const botMessage: Message = {

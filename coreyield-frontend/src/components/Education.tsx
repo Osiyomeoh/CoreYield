@@ -35,10 +35,8 @@ export const Education: React.FC<EducationProps> = ({
     timePeriod: 12,
     monthlyContribution: 100
   })
-  // Removed unused simulationResults state
   const [isAnimating, setIsAnimating] = useState(false)
 
-  // Real people storylines
   const characters: StoryCharacter[] = [
     {
       name: "Sarah Chen",
@@ -284,7 +282,6 @@ Always diversify your investments and never invest more than you can afford to l
   const currentPageData = currentContent.pages[currentPage]
   const totalPages = currentContent.pages.length
 
-  // Calculate yield projections
   const calculateYield = () => {
     const { initialAmount, apy, timePeriod, monthlyContribution } = calculatorInputs
     const monthlyRate = apy / 100 / 12
@@ -305,9 +302,8 @@ Always diversify your investments and never invest more than you can afford to l
     return projections
   }
 
-  // Gas cost simulation
   const simulateGasCosts = () => {
-    const gasPrices = [20, 30, 50, 100, 200] // gwei
+    const gasPrices = [20, 30, 50, 100, 200]
     const operations = [
       { name: 'Approve', gas: 46000 },
       { name: 'Deposit', gas: 120000 },
@@ -319,7 +315,7 @@ Always diversify your investments and never invest more than you can afford to l
       operation: op.name,
       costs: gasPrices.map(price => ({
         gasPrice: price,
-        cost: (op.gas * price * 0.000000001 * 2000).toFixed(4) // ETH price $2000
+        cost: (op.gas * price * 0.000000001 * 2000).toFixed(4)
       }))
     }))
   }
@@ -577,7 +573,6 @@ Always diversify your investments and never invest more than you can afford to l
               <div className="prose prose-invert max-w-none">
                 <div className="text-gray-200 leading-relaxed text-lg">
                   {currentPageData.content.split('\n').map((line, index) => {
-                    // Handle lines that start with ** and end with ** (standalone bold terms)
                     if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
                       const text = line.trim().slice(2, -2)
                       return (
@@ -586,7 +581,6 @@ Always diversify your investments and never invest more than you can afford to l
                         </div>
                       )
                     } 
-                    // Handle bullet points with bold terms: • **Term**: Description
                     else if (line.includes('• **') && line.includes('**:')) {
                       const match = line.match(/• \*\*(.*?)\*\*: (.*)/)
                       if (match) {
@@ -601,7 +595,6 @@ Always diversify your investments and never invest more than you can afford to l
                         )
                       }
                     }
-                    // Handle regular bullet points: • Description
                     else if (line.trim().startsWith('• ')) {
                       return (
                         <div key={index} className="flex items-start space-x-2 mb-2">
@@ -610,13 +603,10 @@ Always diversify your investments and never invest more than you can afford to l
                         </div>
                       )
                     }
-                    // Handle empty lines
                     else if (line.trim() === '') {
                       return <div key={index} className="h-4"></div>
                     }
-                    // Handle regular text with potential bold terms
                     else {
-                      // Process any remaining ** terms in regular text
                       const processedLine = line.replace(/\*\*(.*?)\*\*/g, (_, text) => {
                         return `<span class="font-bold text-blue-400">${text}</span>`
                       })

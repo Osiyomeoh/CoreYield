@@ -32,11 +32,10 @@ export const YieldDemo: React.FC<YieldDemoProps> = ({
   const hasYTTokens = ytBalance && ytBalance > 0n
   const hasClaimableYield = ytClaimableYield && ytClaimableYield > 0n
 
-  // Calculate projected yields based on APY (frontend calculation)
   const calculatePTImpliedYield = (ptAmount: bigint, daysHeld: number = 30): number => {
     if (!ptAmount || ptAmount === 0n) return 0
     const ptBalance = Number(ptAmount) / 1e18
-    const assetAPY = selectedAsset.apy / 100 // Convert percentage to decimal
+    const assetAPY = selectedAsset.apy / 100
     const dailyRate = assetAPY / 365
     return ptBalance * dailyRate * daysHeld
   }
@@ -44,7 +43,7 @@ export const YieldDemo: React.FC<YieldDemoProps> = ({
   const calculateYTYield = (ytAmount: bigint, daysHeld: number = 30): number => {
     if (!ytAmount || ytAmount === 0n) return 0
     const ytBalance = Number(ytAmount) / 1e18
-    const assetAPY = selectedAsset.apy / 100 // Convert percentage to decimal
+    const assetAPY = selectedAsset.apy / 100
     const dailyRate = assetAPY / 365
     return ytBalance * dailyRate * daysHeld
   }

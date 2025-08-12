@@ -24,7 +24,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
   before(async function () {
     [owner, user1, user2, user3] = await ethers.getSigners();
     
-    // Deploy contracts
     const CoreYieldFactory = await ethers.getContractFactory("CoreYieldFactory");
     coreYieldFactory = await CoreYieldFactory.deploy();
     await coreYieldFactory.waitForDeployment();
@@ -55,7 +54,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     syLstBTC = await StandardizedYieldToken.deploy("SY-lstBTC", "SY-lstBTC", await mockLstBTC.getAddress(), 1200);
     await syLstBTC.waitForDeployment();
     
-    // Verify contracts are deployed
     expect(coreYieldFactory).to.not.be.null;
     expect(coreYieldAMM).to.not.be.null;
     expect(liquidityMining).to.not.be.null;
@@ -65,10 +63,9 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     expect(syStCORE).to.not.be.null;
     expect(syLstBTC).to.not.be.null;
     
-    // Create markets - Fix: Use SY token addresses instead of mock token addresses
     const tx1 = await coreYieldFactory.createMarket(
       await syStCORE.getAddress(),
-      365 * 24 * 60 * 60, // 1 year
+      365 * 24 * 60 * 60,
       "PT-stCORE", "PT-stCORE",
       "YT-stCORE", "YT-stCORE",
       parseEther("100"), parseEther("1000000")
@@ -77,14 +74,13 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     
     const tx2 = await coreYieldFactory.createMarket(
       await syLstBTC.getAddress(),
-      365 * 24 * 60 * 60, // 1 year
+      365 * 24 * 60 * 60,
       "PT-lstBTC", "PT-lstBTC",
       "YT-lstBTC", "YT-lstBTC",
       parseEther("0.1"), parseEther("1000")
     );
     const receipt2 = await tx2.wait();
     
-    // Get market info from events
     const market1Event = receipt1?.logs.find(log => {
       try {
         const parsed = coreYieldFactory.interface.parseLog(log);
@@ -102,7 +98,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       }
     });
     
-    // Parse market addresses from events
     const market1Data = coreYieldFactory.interface.parseLog(market1Event!);
     const market2Data = coreYieldFactory.interface.parseLog(market2Event!);
     
@@ -118,12 +113,10 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       ytToken: market2Data?.args[2]
     };
     
-    // Setup initial liquidity
     await mockStCORE.mint(owner.address, parseEther("10000"));
     await mockLstBTC.mint(owner.address, parseEther("100"));
     await mockDualCORE.mint(owner.address, parseEther("10000"));
     
-    // Wrap and split tokens
     await mockStCORE.approve(await syStCORE.getAddress(), parseEther("1000"));
     await mockLstBTC.approve(await syLstBTC.getAddress(), parseEther("10"));
     
@@ -136,7 +129,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     await coreYieldFactory.splitTokens(await syStCORE.getAddress(), parseEther("500"), 0, 0);
     await coreYieldFactory.splitTokens(await syLstBTC.getAddress(), parseEther("5"), 0, 0);
     
-    // Setup AMM pools - Fix: Wait for market to be properly set up
     await ethers.provider.send("evm_increaseTime", [1]);
     await ethers.provider.send("evm_mine");
     
@@ -153,7 +145,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     await coreYieldAMM.createPool(await syStCORE.getAddress(), parseEther("250"), parseEther("250"));
     await coreYieldAMM.createPool(await syLstBTC.getAddress(), parseEther("2.5"), parseEther("2.5"));
     
-    // Setup liquidity mining
     await liquidityMining.addPool(await syStCORE.getAddress(), await mockDualCORE.getAddress(), parseEther("0.1"));
     await liquidityMining.addPool(await syLstBTC.getAddress(), await mockDualCORE.getAddress(), parseEther("0.05"));
     
@@ -163,19 +154,16 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
   describe("📊 Advanced Yield Math", function () {
     it("Should calculate PT/YT prices correctly", async function () {
       const syAmount = parseEther("100");
-      const maturity = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60; // 1 year from now
+      const maturity = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
       const currentTime = Math.floor(Date.now() / 1000);
-      const yieldRate = 800; // 8%
+      const yieldRate = 800;
       
-      // This would test the LibYieldMath library functions
-      // For now, we'll test the basic concept
       expect(syAmount).to.equal(parseEther("100"));
       expect(maturity).to.be.greaterThan(currentTime);
       expect(yieldRate).to.equal(800);
     });
     
     it("Should handle yield curve interpolation", async function () {
-      // Test yield curve functionality
       const currentTime = Math.floor(Date.now() / 1000);
       expect(currentTime).to.be.greaterThan(0);
     });
@@ -195,11 +183,9 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     });
     
     it("Should add liquidity correctly", async function () {
-      // User1 adds liquidity
       const ptStCORE = await ethers.getContractAt("CorePrincipalToken", market1.ptToken);
       const ytStCORE = await ethers.getContractAt("CoreYieldToken", market1.ytToken);
       
-      // Fix: Use the factory to split tokens instead of minting directly
       await mockStCORE.mint(user1.address, parseEther("200"));
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user1).wrap(parseEther("200"));
@@ -209,7 +195,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       await ptStCORE.connect(user1).approve(await coreYieldAMM.getAddress(), parseEther("100"));
       await ytStCORE.connect(user1).approve(await coreYieldAMM.getAddress(), parseEther("100"));
       
-      // Fix: The function returns a transaction, not a value
       await coreYieldAMM.connect(user1).addLiquidity(
         await syStCORE.getAddress(),
         parseEther("100"),
@@ -217,13 +202,11 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
         0
       );
       
-      // Check user position instead of return value
       const userPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       expect(userPosition.liquidity).to.be.greaterThan(0);
     });
     
     it("Should execute swaps correctly", async function () {
-      // User2 swaps PT for YT - Fix: Set up user2 with tokens first
       await mockStCORE.mint(user2.address, parseEther("100"));
       await mockStCORE.connect(user2).approve(await syStCORE.getAddress(), parseEther("100"));
       await syStCORE.connect(user2).wrap(parseEther("100"));
@@ -233,14 +216,12 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       const ptStCORE = await ethers.getContractAt("CorePrincipalToken", market1.ptToken);
       await ptStCORE.connect(user2).approve(await coreYieldAMM.getAddress(), parseEther("50"));
       
-      // Fix: The function returns a transaction, not a value
       await coreYieldAMM.connect(user2).swapPTForYT(
         await syStCORE.getAddress(),
         parseEther("50"),
         0
       );
       
-      // Check reserves updated instead of return value
       const reserves = await coreYieldAMM.getPoolReserves(await syStCORE.getAddress());
       expect(reserves.ptReserves).to.be.greaterThan(parseEther("250"));
     });
@@ -248,7 +229,7 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     it("Should provide accurate swap quotes", async function () {
       const [amountOut, fee] = await coreYieldAMM.getSwapQuote(
         await syStCORE.getAddress(),
-        true, // PT to YT
+        true,
         parseEther("10")
       );
       
@@ -260,7 +241,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       const userPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       const liquidityToRemove = userPosition.liquidity / 2n;
       
-      // Fix: The function returns a transaction, not values
       await coreYieldAMM.connect(user1).removeLiquidity(
         await syStCORE.getAddress(),
         liquidityToRemove,
@@ -268,7 +248,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
         0
       );
       
-      // Check that liquidity was reduced
       const newPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       expect(newPosition.liquidity).to.be.lessThan(userPosition.liquidity);
     });
@@ -282,36 +261,29 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     });
     
     it("Should calculate APY correctly", async function () {
-      // Fix: Stake some liquidity first to get non-zero APY
       const stakeAmount = parseEther("100");
       await liquidityMining.connect(user3).stake(await syStCORE.getAddress(), stakeAmount);
       
-      // Fast forward time to accumulate rewards
-      await ethers.provider.send("evm_increaseTime", [3600]); // 1 hour
+      await ethers.provider.send("evm_increaseTime", [3600]);
       await ethers.provider.send("evm_mine");
       
-      // Fix: Check the correct pool that has staked liquidity
       const apy1 = await liquidityMining.getPoolAPY(await syStCORE.getAddress());
       expect(apy1).to.be.greaterThan(0);
       
-      // The second pool has no staked liquidity, so APY will be 0
       const apy2 = await liquidityMining.getPoolAPY(await syLstBTC.getAddress());
       expect(apy2).to.equal(0);
     });
     
     it("Should stake and unstake correctly", async function () {
-      // Use user1 for this test to avoid state interference
       const ptAmount = parseEther("100");
       const ytAmount = parseEther("100");
       
-      // First ensure user1 has the tokens by splitting SY tokens
       await mockStCORE.mint(user1.address, parseEther("200"));
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user1).wrap(parseEther("200"));
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("200"));
       await coreYieldFactory.connect(user1).splitTokens(await syStCORE.getAddress(), parseEther("200"), 0, 0);
       
-      // First add liquidity to get liquidity tokens
       const ptStCORE = await ethers.getContractAt("CorePrincipalToken", market1.ptToken);
       const ytStCORE = await ethers.getContractAt("CoreYieldToken", market1.ytToken);
       
@@ -325,19 +297,15 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
         0
       );
       
-      // Get the actual liquidity amount from user position
       const userPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       const liquidityAmount = userPosition.liquidity;
       
-      // Now stake the actual liquidity amount
       await liquidityMining.connect(user1).stake(await syStCORE.getAddress(), liquidityAmount);
       
       let userStaked = await liquidityMining.getUserStakedAmount(await syStCORE.getAddress(), user1.address);
       
-      // Fix: The staked amount should equal the liquidity amount that was staked
       expect(userStaked).to.equal(liquidityAmount);
       
-      // Unstake
       await liquidityMining.connect(user1).unstake(await syStCORE.getAddress(), liquidityAmount);
       
       userStaked = await liquidityMining.getUserStakedAmount(await syStCORE.getAddress(), user1.address);
@@ -345,11 +313,9 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     });
     
     it("Should accumulate rewards correctly", async function () {
-      // Use user2 for this test to avoid state interference
       const ptAmount = parseEther("100");
       const ytAmount = parseEther("100");
       
-      // Ensure user2 has fresh tokens for this test
       await mockStCORE.mint(user2.address, parseEther("200"));
       await mockStCORE.connect(user2).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user2).wrap(parseEther("200"));
@@ -374,8 +340,7 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       
       await liquidityMining.connect(user2).stake(await syStCORE.getAddress(), liquidityAmount);
       
-      // Fast forward time (simulate)
-      await ethers.provider.send("evm_increaseTime", [3600]); // 1 hour
+      await ethers.provider.send("evm_increaseTime", [3600]);
       await ethers.provider.send("evm_mine");
       
       const pendingRewards = await liquidityMining.pendingRewards(await syStCORE.getAddress(), user2.address);
@@ -383,11 +348,9 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     });
     
     it("Should claim rewards correctly", async function () {
-      // Use user3 for this test to avoid state interference
       const ptAmount = parseEther("100");
       const ytAmount = parseEther("100");
       
-      // Ensure user3 has fresh tokens for this test
       await mockStCORE.mint(user3.address, parseEther("200"));
       await mockStCORE.connect(user3).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user3).wrap(parseEther("200"));
@@ -412,11 +375,9 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       
       await liquidityMining.connect(user3).stake(await syStCORE.getAddress(), liquidityAmount);
       
-      // Fast forward time to accumulate rewards - need more time for significant rewards
-      await ethers.provider.send("evm_increaseTime", [86400]); // 24 hours
+      await ethers.provider.send("evm_increaseTime", [86400]);
       await ethers.provider.send("evm_mine");
       
-      // Check that rewards have accumulated
       const pendingRewards = await liquidityMining.pendingRewards(await syStCORE.getAddress(), user3.address);
       expect(pendingRewards).to.be.greaterThan(0);
       
@@ -425,7 +386,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       const tx = await liquidityMining.connect(user3).claimRewards(await syStCORE.getAddress());
       const receipt = await tx.wait();
       
-      // Get the reward amount from the event
       const event = receipt.logs.find(log => {
         try {
           const parsed = liquidityMining.interface.parseLog(log);
@@ -447,23 +407,19 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🔄 Integration Tests", function () {
     it("Should execute complete yield farming cycle with AMM", async function () {
-      // 1. User invests in SY tokens
       await mockStCORE.mint(user1.address, parseEther("200"));
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user1).wrap(parseEther("200"));
       
-      // 2. Split tokens
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("200"));
       await coreYieldFactory.connect(user1).splitTokens(await syStCORE.getAddress(), parseEther("200"), 0, 0);
       
-      // 3. Add liquidity to AMM
       const ptStCORE = await ethers.getContractAt("CorePrincipalToken", market1.ptToken);
       const ytStCORE = await ethers.getContractAt("CoreYieldToken", market1.ytToken);
       
       await ptStCORE.connect(user1).approve(await coreYieldAMM.getAddress(), parseEther("100"));
       await ytStCORE.connect(user1).approve(await coreYieldAMM.getAddress(), parseEther("100"));
       
-      // Fix: Extract liquidity amount from transaction response
       await coreYieldAMM.connect(user1).addLiquidity(
         await syStCORE.getAddress(),
         parseEther("100"),
@@ -471,27 +427,21 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
         0
       );
       
-      // Get the actual liquidity amount from user position
       const userPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       const liquidityAmount = userPosition.liquidity;
       
-      // 4. Stake in liquidity mining
       await liquidityMining.connect(user1).stake(await syStCORE.getAddress(), liquidityAmount);
       
-      // 5. Fast forward and claim rewards
-      await ethers.provider.send("evm_increaseTime", [7200]); // 2 hours
+      await ethers.provider.send("evm_increaseTime", [7200]);
       await ethers.provider.send("evm_mine");
       
       const rewards = await liquidityMining.pendingRewards(await syStCORE.getAddress(), user1.address);
       expect(rewards).to.be.greaterThan(0);
       
-      // 6. Unstake and remove liquidity
       await liquidityMining.connect(user1).unstake(await syStCORE.getAddress(), liquidityAmount);
       
-      // Fix: Remove only a portion of liquidity to avoid overflow
       const liquidityToRemove = liquidityAmount / 2n;
       
-      // Call removeLiquidity and handle the response properly
       const tx = await coreYieldAMM.connect(user1).removeLiquidity(
         await syStCORE.getAddress(),
         liquidityToRemove,
@@ -499,17 +449,14 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
         0
       );
       
-      // Wait for the transaction to be mined
       const receipt = await tx.wait();
       
-      // Get the updated position to verify the change
       const newPosition = await coreYieldAMM.userPositions(await syStCORE.getAddress(), user1.address);
       expect(newPosition.liquidity).to.be.lessThan(liquidityAmount);
       expect(newPosition.liquidity).to.be.greaterThan(0);
     });
     
     it("Should handle yield distribution with AMM trading", async function () {
-      // Distribute yield
       const yieldAmount = parseEther("50");
       await mockStCORE.mint(owner.address, yieldAmount);
       await mockStCORE.approve(await syStCORE.getAddress(), yieldAmount);
@@ -518,7 +465,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       
       await coreYieldFactory.distributeYieldFromSource(await syStCORE.getAddress(), yieldAmount, owner.address);
       
-      // Check that users can trade the new yield
       const reserves = await coreYieldAMM.getPoolReserves(await syStCORE.getAddress());
       expect(reserves.ptReserves).to.be.greaterThan(parseEther("250"));
     });
@@ -526,7 +472,7 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
 
   describe("⚙️ Admin Functions", function () {
     it("Should allow owner to update fees", async function () {
-      const newSwapFee = 50; // 0.5%
+      const newSwapFee = 50;
       await coreYieldAMM.updateSwapFee(newSwapFee);
       
       expect(await coreYieldAMM.swapFee()).to.equal(newSwapFee);
@@ -536,7 +482,6 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
       const newRate = parseEther("0.2");
       await liquidityMining.updateRewardRate(await syStCORE.getAddress(), newRate);
       
-      // Verify the rate was updated
       const poolRewards = await liquidityMining.poolRewards(await syStCORE.getAddress());
       expect(poolRewards.rewardRate).to.equal(newRate);
     });
@@ -561,12 +506,10 @@ describe("🚀 Advanced CoreYield Protocol - Complete Test Suite", function () {
     });
     
     it("Should handle edge cases gracefully", async function () {
-      // Test with zero amounts
       await expect(
         coreYieldAMM.connect(user1).addLiquidity(await syStCORE.getAddress(), 0, parseEther("100"), 0)
       ).to.be.revertedWith("Invalid amounts");
       
-      // Test with insufficient balance
       await expect(
         coreYieldAMM.connect(user1).swapPTForYT(await syStCORE.getAddress(), parseEther("10000"), 0)
       ).to.be.reverted;

@@ -1,9 +1,7 @@
-// test/CoreYield.test.ts
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
-// Fix: Use ethers v6 syntax
 const parseEther = ethers.parseEther;
 const formatEther = ethers.formatEther;
 
@@ -16,7 +14,6 @@ import {
 } from "../typechain-types";
 
 describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
-  // Contract instances
   let mockStCORE: MockStCORE;
   let mockLstBTC: MockLstBTC;
   let mockDualCORE: MockDualCORE;
@@ -25,7 +22,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
   let syDualCORE: StandardizedYieldToken;
   let coreYieldFactory: CoreYieldFactory;
   
-  // Signers
   let owner: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -39,7 +35,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("📦 Contract Deployment", function () {
     it("Should deploy all mock assets with correct parameters", async function () {
-      // Deploy Mock Assets
       const MockStCOREFactory = await ethers.getContractFactory("MockStCORE");
       mockStCORE = await MockStCOREFactory.deploy();
       await mockStCORE.waitForDeployment();
@@ -52,18 +47,17 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       mockDualCORE = await MockDualCOREFactory.deploy();
       await mockDualCORE.waitForDeployment();
 
-      // Verify deployments
       expect(await mockStCORE.name()).to.equal("Staked CORE");
       expect(await mockStCORE.symbol()).to.equal("stCORE");
-      expect(await mockStCORE.getRewardRate()).to.equal(850); // 8.5% APY
+      expect(await mockStCORE.getRewardRate()).to.equal(850);
 
       expect(await mockLstBTC.name()).to.equal("Liquid Staked BTC");
       expect(await mockLstBTC.symbol()).to.equal("lstBTC");
-      expect(await mockLstBTC.getRewardRate()).to.equal(420); // 4.2% APY
+      expect(await mockLstBTC.getRewardRate()).to.equal(420);
 
       expect(await mockDualCORE.name()).to.equal("Dual Staked CORE");
       expect(await mockDualCORE.symbol()).to.equal("dualCORE");
-      expect(await mockDualCORE.getRewardRate()).to.equal(1210); // 12.1% APY
+      expect(await mockDualCORE.getRewardRate()).to.equal(1210);
 
       console.log("✅ All mock assets deployed successfully");
     });
@@ -71,7 +65,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     it("Should deploy SY tokens for each asset", async function () {
       const SYTokenFactory = await ethers.getContractFactory("StandardizedYieldToken");
 
-      // Deploy SY-stCORE
       syStCORE = await SYTokenFactory.deploy(
         "SY-stCORE",
         "SY-stCORE",
@@ -80,7 +73,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       );
       await syStCORE.waitForDeployment();
 
-      // Deploy SY-lstBTC
       syLstBTC = await SYTokenFactory.deploy(
         "SY-lstBTC",
         "SY-lstBTC",
@@ -89,7 +81,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       );
       await syLstBTC.waitForDeployment();
 
-      // Deploy SY-dualCORE
       syDualCORE = await SYTokenFactory.deploy(
         "SY-dualCORE",
         "SY-dualCORE",
@@ -112,10 +103,9 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("📊 Market Creation", function () {
     it("Should create markets for each asset", async function () {
-      // Create market for stCORE
       const stCORETx = await coreYieldFactory.createMarket(
         await syStCORE.getAddress(),
-        30 * 24 * 60 * 60, // 30 days
+        30 * 24 * 60 * 60,
         "PT-stCORE",
         "PT-stCORE",
         "YT-stCORE",
@@ -126,10 +116,9 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       const stCOREReceipt = await stCORETx.wait();
       console.log("✅ stCORE market created");
 
-      // Create market for lstBTC
       const lstBTCTx = await coreYieldFactory.createMarket(
         await syLstBTC.getAddress(),
-        30 * 24 * 60 * 60, // 30 days
+        30 * 24 * 60 * 60,
         "PT-lstBTC",
         "PT-lstBTC",
         "YT-lstBTC",
@@ -140,10 +129,9 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       const lstBTCReceipt = await lstBTCTx.wait();
       console.log("✅ lstBTC market created");
 
-      // Create market for dualCORE
       const dualCORETx = await coreYieldFactory.createMarket(
         await syDualCORE.getAddress(),
-        30 * 24 * 60 * 60, // 30 days
+        30 * 24 * 60 * 60,
         "PT-dualCORE",
         "PT-dualCORE",
         "YT-dualCORE",
@@ -160,13 +148,10 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("💰 Token Operations", function () {
     it("Should allow users to wrap tokens", async function () {
-      // Mint some stCORE to user1
       await mockStCORE.mint(user1.address, parseEther("1000"));
       
-      // Approve SY token to spend stCORE
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("1000"));
       
-      // Wrap tokens
       await syStCORE.connect(user1).wrap(parseEther("100"));
       
       expect(await syStCORE.balanceOf(user1.address)).to.equal(parseEther("100"));
@@ -174,19 +159,14 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should split lstBTC SY tokens into PT + YT", async function () {
-      // Mint some lstBTC to user1
       await mockLstBTC.mint(user1.address, parseEther("1"));
       
-      // Approve SY token to spend lstBTC
       await mockLstBTC.connect(user1).approve(await syLstBTC.getAddress(), parseEther("1"));
       
-      // Wrap tokens
       await syLstBTC.connect(user1).wrap(parseEther("0.5"));
       
-      // Approve Factory to spend SY tokens
       await syLstBTC.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("0.5"));
       
-      // Split tokens
       await coreYieldFactory.connect(user1).splitTokens(
         await syLstBTC.getAddress(),
         parseEther("0.5"),
@@ -198,19 +178,14 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should split dualCORE SY tokens into PT + YT", async function () {
-      // Mint some dualCORE to user1
       await mockDualCORE.mint(user1.address, parseEther("1000"));
       
-      // Approve SY token to spend dualCORE
       await mockDualCORE.connect(user1).approve(await syDualCORE.getAddress(), parseEther("1000"));
       
-      // Wrap tokens
       await syDualCORE.connect(user1).wrap(parseEther("100"));
       
-      // Approve Factory to spend SY tokens
       await syDualCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("100"));
       
-      // Split tokens
       await coreYieldFactory.connect(user1).splitTokens(
         await syDualCORE.getAddress(),
         parseEther("100"),
@@ -254,19 +229,14 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🔄 Advanced Features", function () {
     it("Should support multi-user scenarios", async function () {
-      // Mint some stCORE to user2
       await mockStCORE.mint(user2.address, parseEther("500"));
       
-      // Approve SY token to spend stCORE
       await mockStCORE.connect(user2).approve(await syStCORE.getAddress(), parseEther("500"));
       
-      // Wrap tokens
       await syStCORE.connect(user2).wrap(parseEther("50"));
       
-      // Approve Factory to spend SY tokens
       await syStCORE.connect(user2).approve(await coreYieldFactory.getAddress(), parseEther("50"));
       
-      // Split tokens
       await coreYieldFactory.connect(user2).splitTokens(
         await syStCORE.getAddress(),
         parseEther("50"),
@@ -299,7 +269,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should reject operations on inactive markets", async function () {
-      // Pause market
       await coreYieldFactory.pauseMarket(await syStCORE.getAddress());
       
       await expect(
@@ -311,7 +280,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         )
       ).to.be.revertedWith("Market inactive");
       
-      // Resume market
       await coreYieldFactory.resumeMarket(await syStCORE.getAddress());
       console.log("✅ Market pause/resume successful");
     });
@@ -354,9 +322,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should prevent reentrancy attacks", async function () {
-      // This test verifies that the nonReentrant modifier is working
-      // by attempting to call splitTokens multiple times
-      // First ensure user has sufficient SY tokens and approval
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("20"));
       
       await expect(
@@ -371,7 +336,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should maintain proper token accounting", async function () {
-      // Ensure user has sufficient SY tokens and approval for this test
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("20"));
       
       const userPosition = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), user1.address);
@@ -383,7 +347,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("📈 Performance & Gas Optimization", function () {
     it("Should complete operations within reasonable gas limits", async function () {
-      // Ensure user has sufficient SY tokens and approval
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("20"));
       
       const tx = await coreYieldFactory.connect(user1).splitTokens(
@@ -394,17 +357,14 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       );
       
       const receipt = await tx.wait();
-      expect(receipt?.gasUsed).to.be.lessThan(500000); // 500k gas limit
+      expect(receipt?.gasUsed).to.be.lessThan(500000);
       console.log("✅ Gas optimization successful");
     });
 
     it("Should handle batch operations efficiently", async function () {
-      // Test batch yield distribution
       const syTokens = [await syStCORE.getAddress(), await syLstBTC.getAddress()];
       const yieldAmounts = [parseEther("10"), parseEther("5")];
       
-      // For yield distribution, we need to use underlying assets that can be wrapped to SY
-      // First wrap some tokens to get SY tokens
       await mockStCORE.mint(owner.address, parseEther("10"));
       await mockLstBTC.mint(owner.address, parseEther("5"));
       await mockStCORE.approve(await syStCORE.getAddress(), parseEther("10"));
@@ -412,7 +372,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       await syStCORE.wrap(parseEther("10"));
       await syLstBTC.wrap(parseEther("5"));
       
-      // Now approve factory to spend SY tokens
       await syStCORE.approve(await coreYieldFactory.getAddress(), parseEther("10"));
       await syLstBTC.approve(await coreYieldFactory.getAddress(), parseEther("5"));
       
@@ -423,18 +382,15 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🔄 Complete Protocol Integration Test", function () {
     it("Should execute full yield farming cycle", async function () {
-      // Reset user2 balance to avoid accumulation from previous tests
       const currentBalance = await syStCORE.balanceOf(user2.address);
       if (currentBalance > 0) {
         await syStCORE.connect(user2).unwrap(currentBalance);
       }
       
-      // 1. User wraps tokens
       await mockStCORE.mint(user2.address, parseEther("200"));
       await mockStCORE.connect(user2).approve(await syStCORE.getAddress(), parseEther("200"));
       await syStCORE.connect(user2).wrap(parseEther("200"));
       
-      // 2. User splits tokens
       await syStCORE.connect(user2).approve(await coreYieldFactory.getAddress(), parseEther("200"));
       await coreYieldFactory.connect(user2).splitTokens(
         await syStCORE.getAddress(),
@@ -443,8 +399,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         parseEther("180")
       );
       
-      // 3. Check user position - PT and YT amounts should equal SY amount (1:1 ratio)
-      // Note: positions accumulate from previous operations, so we check the total
       const userPosition = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), user2.address);
       expect(userPosition.ptAmount).to.be.greaterThanOrEqual(parseEther("200"));
       expect(userPosition.ytAmount).to.be.greaterThanOrEqual(parseEther("200"));
@@ -453,19 +407,16 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should handle multiple concurrent users", async function () {
-      // User 1 operations
       await mockStCORE.mint(user1.address, parseEther("300"));
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("300"));
       await syStCORE.connect(user1).wrap(parseEther("300"));
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("300"));
       
-      // User 2 operations
       await mockLstBTC.mint(user2.address, parseEther("2"));
       await mockLstBTC.connect(user2).approve(await syLstBTC.getAddress(), parseEther("2"));
       await syLstBTC.connect(user2).wrap(parseEther("2"));
       await syLstBTC.connect(user2).approve(await coreYieldFactory.getAddress(), parseEther("2"));
       
-      // Concurrent splitting
       await Promise.all([
         coreYieldFactory.connect(user1).splitTokens(
           await syStCORE.getAddress(),
@@ -497,13 +448,11 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🎯 Yield Token Operations", function () {
     it("Should allow users to claim yield from YT tokens", async function () {
-      // Setup: User has YT tokens
       await mockStCORE.mint(user1.address, parseEther("100"));
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), parseEther("100"));
       await syStCORE.connect(user1).wrap(parseEther("100"));
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), parseEther("100"));
       
-      // Split tokens to get YT
       await coreYieldFactory.connect(user1).splitTokens(
         await syStCORE.getAddress(),
         parseEther("100"),
@@ -511,10 +460,8 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         parseEther("90")
       );
       
-      // Simulate yield generation
       await mockStCORE.mint(await syStCORE.getAddress(), parseEther("10"));
       
-      // Check claimable yield
       const claimableYield = await coreYieldFactory.getClaimableYield(
         await syStCORE.getAddress(),
         user1.address
@@ -525,15 +472,12 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should handle yield distribution correctly", async function () {
-      // Distribute yield to the market using SY tokens
       const yieldAmount = parseEther("50");
       
-      // First wrap underlying assets to get SY tokens
       await mockStCORE.mint(owner.address, yieldAmount);
       await mockStCORE.approve(await syStCORE.getAddress(), yieldAmount);
       await syStCORE.wrap(yieldAmount);
       
-      // Now approve factory to spend SY tokens
       await syStCORE.approve(await coreYieldFactory.getAddress(), yieldAmount);
       
       await coreYieldFactory.distributeYieldFromSource(
@@ -542,9 +486,7 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         owner.address
       );
       
-      // Verify yield was distributed
       const market = await coreYieldFactory.getMarket(await syStCORE.getAddress());
-      // Note: totalYieldDistributed accumulates from previous operations
       expect(market.totalYieldDistributed).to.be.greaterThanOrEqual(yieldAmount);
       
       console.log("✅ Yield distribution successful");
@@ -561,13 +503,11 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("📊 Market Management", function () {
     it("Should allow owner to pause and resume markets", async function () {
-      // Pause market
       await coreYieldFactory.pauseMarket(await syStCORE.getAddress());
       
       let market = await coreYieldFactory.getMarket(await syStCORE.getAddress());
       expect(market.active).to.be.false;
       
-      // Resume market
       await coreYieldFactory.resumeMarket(await syStCORE.getAddress());
       
       market = await coreYieldFactory.getMarket(await syStCORE.getAddress());
@@ -586,7 +526,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should handle market lifecycle events", async function () {
-      // Test market activation/deactivation
       await coreYieldFactory.pauseMarket(await syLstBTC.getAddress());
       
       let market = await coreYieldFactory.getMarket(await syLstBTC.getAddress());
@@ -603,21 +542,18 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🔐 Advanced Security Tests", function () {
     it("Should prevent unauthorized yield distribution", async function () {
-      // This function doesn't have onlyOwner modifier, so it should succeed
-      // but fail due to insufficient balance instead
       await expect(
         coreYieldFactory.connect(user1).distributeYieldFromSource(
           await syStCORE.getAddress(),
           parseEther("100"),
           user1.address
         )
-      ).to.be.reverted; // Expect any revert since user1 has no SY tokens
+      ).to.be.reverted;
       
       console.log("✅ Unauthorized yield distribution prevention successful");
     });
 
     it("Should prevent market manipulation", async function () {
-      // Test that users cannot create fake markets
       await expect(
         coreYieldFactory.connect(user1).createMarket(
           await syStCORE.getAddress(),
@@ -635,7 +571,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should handle emergency scenarios", async function () {
-      // Test emergency pause functionality
       await coreYieldFactory.emergencyPause();
       
       await expect(
@@ -647,7 +582,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         )
       ).to.be.revertedWith("Market inactive");
       
-      // Resume operations
       await coreYieldFactory.emergencyResume();
       
       console.log("✅ Emergency pause functionality successful");
@@ -656,26 +590,22 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("📈 Performance & Scalability", function () {
     it("Should handle large token amounts efficiently", async function () {
-      const largeAmount = parseEther("1000000"); // 1M tokens
+      const largeAmount = parseEther("1000000");
       
       await mockStCORE.mint(user1.address, largeAmount);
       await mockStCORE.connect(user1).approve(await syStCORE.getAddress(), largeAmount);
       await syStCORE.connect(user1).wrap(largeAmount);
       
       const userBalance = await syStCORE.balanceOf(user1.address);
-      // Account for accumulated balance from previous operations
       expect(userBalance).to.be.greaterThanOrEqual(largeAmount);
       
       console.log("✅ Large amount handling successful");
     });
 
     it("Should support batch operations efficiently", async function () {
-      // Test batch yield distribution
       const syTokens = [await syStCORE.getAddress(), await syLstBTC.getAddress()];
       const yieldAmounts = [parseEther("10"), parseEther("5")];
       
-      // For yield distribution, we need to use underlying assets that can be wrapped to SY
-      // First wrap some tokens to get SY tokens
       await mockStCORE.mint(owner.address, parseEther("10"));
       await mockLstBTC.mint(owner.address, parseEther("5"));
       await mockStCORE.approve(await syStCORE.getAddress(), parseEther("10"));
@@ -683,7 +613,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
       await syStCORE.wrap(parseEther("10"));
       await syLstBTC.wrap(parseEther("5"));
       
-      // Now approve factory to spend SY tokens
       await syStCORE.approve(await coreYieldFactory.getAddress(), parseEther("10"));
       await syLstBTC.approve(await coreYieldFactory.getAddress(), parseEther("5"));
       
@@ -694,11 +623,9 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🔄 Integration & Interoperability", function () {
     it("Should work with different token standards", async function () {
-      // Test with different decimal tokens
       const mockToken18 = await (await ethers.getContractFactory("MockStCORE")).deploy();
       const mockToken6 = await (await ethers.getContractFactory("MockLstBTC")).deploy();
       
-      // Verify different decimal handling - MockLstBTC actually has 18 decimals, not 6
       expect(await mockToken18.decimals()).to.equal(18);
       expect(await mockToken6.decimals()).to.equal(18);
       
@@ -706,7 +633,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should integrate with external price feeds", async function () {
-      // Test price oracle integration
       const MockPriceOracle = await ethers.getContractFactory("MockPriceOracle");
       const priceOracle = await MockPriceOracle.deploy();
       
@@ -719,21 +645,17 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🎯 User Experience & Edge Cases", function () {
     it("Should handle user onboarding smoothly", async function () {
-      // New user with no previous activity
       const newUser = user2;
       
-      // Reset user2 balance to avoid accumulation from previous tests
       const currentBalance = await syStCORE.balanceOf(newUser.address);
       if (currentBalance > 0) {
         await syStCORE.connect(newUser).unwrap(currentBalance);
       }
       
-      // First time wrapping
       await mockStCORE.mint(newUser.address, parseEther("100"));
       await mockStCORE.connect(newUser).approve(await syStCORE.getAddress(), parseEther("100"));
       await syStCORE.connect(newUser).wrap(parseEther("100"));
       
-      // First time splitting
       await syStCORE.connect(newUser).approve(await coreYieldFactory.getAddress(), parseEther("100"));
       await coreYieldFactory.connect(newUser).splitTokens(
         await syStCORE.getAddress(),
@@ -742,8 +664,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         parseEther("90")
       );
       
-      // Verify user position - PT and YT amounts should equal SY amount (1:1 ratio)
-      // Note: positions accumulate from previous operations, so we check the total
       const position = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), newUser.address);
       expect(position.ptAmount).to.be.greaterThanOrEqual(parseEther("100"));
       expect(position.ytAmount).to.be.greaterThanOrEqual(parseEther("100"));
@@ -752,7 +672,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
     });
 
     it("Should handle partial operations gracefully", async function () {
-      // Test partial token splitting
       const partialAmount = parseEther("50");
       await syStCORE.connect(user1).approve(await coreYieldFactory.getAddress(), partialAmount);
       
@@ -763,7 +682,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         parseEther("45")
       );
       
-      // Verify partial position
       const position = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), user1.address);
       expect(position.ptAmount).to.be.greaterThan(0);
       expect(position.ytAmount).to.be.greaterThan(0);
@@ -774,7 +692,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
 
   describe("🏁 Final Integration & Cleanup", function () {
     it("Should maintain protocol integrity after all operations", async function () {
-      // Verify all markets are still active
       const markets = [
         await syStCORE.getAddress(),
         await syLstBTC.getAddress(),
@@ -786,7 +703,6 @@ describe("🚀 CoreYield Protocol - Complete Test Suite", function () {
         expect(marketInfo.active).to.be.true;
       }
       
-      // Verify user positions are maintained
       const user1Position = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), user1.address);
       const user2Position = await coreYieldFactory.getUserPosition(await syStCORE.getAddress(), user2.address);
       

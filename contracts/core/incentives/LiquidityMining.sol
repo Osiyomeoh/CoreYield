@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -17,24 +16,21 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
     
-    // Pool reward structure
     struct PoolRewards {
-        address rewardToken;       // Token distributed as rewards
-        uint256 rewardRate;        // Rewards per second
-        uint256 lastUpdateTime;    // Last time rewards were updated
-        uint256 rewardPerTokenStored; // Accumulated rewards per token
-        uint256 totalStaked;       // Total staked liquidity
+        address rewardToken;
+        uint256 rewardRate;
+        uint256 lastUpdateTime;
+        uint256 rewardPerTokenStored;
+        uint256 totalStaked;
     }
     
-    // User reward structure
     struct UserRewards {
-        uint256 rewardPerTokenPaid; // User's last reward per token
-        uint256 rewards;            // User's accumulated rewards
-        uint256 lastStakeTime;      // Last time user staked
-        uint256 totalStaked;        // Total amount staked by user
+        uint256 rewardPerTokenPaid;
+        uint256 rewards;
+        uint256 lastStakeTime;
+        uint256 totalStaked;
     }
     
-    // Events
     event PoolAdded(address indexed syToken, address indexed rewardToken, uint256 rewardRate);
     event PoolRemoved(address indexed syToken);
     event Staked(address indexed user, address indexed syToken, uint256 amount);
@@ -42,7 +38,6 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
     event RewardsClaimed(address indexed user, address indexed rewardToken, uint256 amount);
     event RewardRateUpdated(address indexed syToken, uint256 newRate);
     
-    // State variables
     mapping(address => PoolRewards) public poolRewards;
     mapping(address => mapping(address => UserRewards)) public userRewards;
     mapping(address => bool) public supportedPools;
@@ -51,7 +46,7 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
     CoreYieldAMM public immutable amm;
     
     uint256 public constant PRECISION = 1e18;
-    uint256 public constant MIN_STAKE_AMOUNT = 1e18; // 1 token minimum
+    uint256 public constant MIN_STAKE_AMOUNT = 1e18;
     
     constructor(address _amm) Ownable(msg.sender) {
         require(_amm != address(0), "Invalid AMM address");
@@ -98,7 +93,6 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         
         supportedPools[syToken] = false;
         
-        // Remove from active pools array
         for (uint256 i = 0; i < activePools.length; i++) {
             if (activePools[i] == syToken) {
                 activePools[i] = activePools[activePools.length - 1];
@@ -122,22 +116,16 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         PoolRewards storage pool = poolRewards[syToken];
         UserRewards storage user = userRewards[syToken][msg.sender];
         
-        // Update rewards before staking
         _updateRewards(syToken);
         _updateUserRewards(syToken, msg.sender);
         
-        // Transfer liquidity tokens from user
-        // Note: This assumes the AMM has a liquidity token or we're staking the LP position
-        // For now, we'll use a simplified approach
         (uint256 ptReserves, uint256 ytReserves) = amm.getPoolReserves(syToken);
         require(ptReserves > 0, "Pool not initialized");
         
-        // Update user rewards
         user.rewardPerTokenPaid = pool.rewardPerTokenStored;
         user.lastStakeTime = block.timestamp;
         user.totalStaked += amount;
         
-        // Update pool totals
         pool.totalStaked += amount;
         
         emit Staked(msg.sender, syToken, amount);
@@ -157,15 +145,12 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         
         require(user.totalStaked >= amount, "Insufficient staked amount");
         
-        // Update rewards before unstaking
         _updateRewards(syToken);
         _updateUserRewards(syToken, msg.sender);
         
-        // Update user rewards
         user.rewardPerTokenPaid = pool.rewardPerTokenStored;
         user.totalStaked -= amount;
         
-        // Update pool totals
         pool.totalStaked -= amount;
         
         emit Unstaked(msg.sender, syToken, amount);
@@ -181,19 +166,15 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         PoolRewards storage pool = poolRewards[syToken];
         UserRewards storage user = userRewards[syToken][msg.sender];
         
-        // Update rewards
         _updateRewards(syToken);
         _updateUserRewards(syToken, msg.sender);
         
-        // Calculate user's rewards
         rewardAmount = user.rewards;
         require(rewardAmount > 0, "No rewards to claim");
         
-        // Reset user rewards
         user.rewards = 0;
         user.rewardPerTokenPaid = pool.rewardPerTokenStored;
         
-        // Transfer rewards to user
         IERC20(pool.rewardToken).safeTransfer(msg.sender, rewardAmount);
         
         emit RewardsClaimed(msg.sender, pool.rewardToken, rewardAmount);
@@ -272,10 +253,8 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         PoolRewards storage pool = poolRewards[syToken];
         if (pool.totalStaked == 0) return 0;
         
-        // Calculate annual rewards
         uint256 annualRewards = pool.rewardRate * 365 days;
         
-        // Calculate APY based on total staked
         uint256 apy = (annualRewards * PRECISION) / pool.totalStaked;
         
         return apy;
@@ -290,7 +269,6 @@ contract LiquidityMining is Ownable, ReentrancyGuard {
         require(supportedPools[syToken], "Pool not found");
         require(newRate >= 0, "Invalid rate");
         
-        // Update rewards before changing rate
         _updateRewards(syToken);
         
         poolRewards[syToken].rewardRate = newRate;
