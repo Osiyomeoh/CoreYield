@@ -1997,7 +1997,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onBackToLanding, o
 
                                                                 {/* Option 1: Just Deposit (Wrap to SY) */}
                                                                 <button
-                                                                    onClick={() => void currentHook.wrapAsset(amount, false)}
+                                                                    onClick={() => { currentHook.wrapAsset(amount, false) }}
                                                                     disabled={!amount || isDepositing}
                                                                     className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white rounded-lg font-semibold transition-colors mb-3"
                                                                 >
