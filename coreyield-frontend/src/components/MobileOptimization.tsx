@@ -243,11 +243,15 @@ export const MobileOptimization: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-2xl text-center">
                 <p className="text-green-100 text-sm">Current APY</p>
-                <p className="text-white text-2xl font-bold">12.5%</p>
+                <p className="text-white text-2xl font-bold">
+                  {coreYield.stakingData.totalAPY ? `${coreYield.stakingData.totalAPY}%` : '0%'}
+                </p>
               </div>
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-2xl text-center">
                 <p className="text-blue-100 text-sm">Total Value</p>
- <p className="text-white text-2xl font-bold">$1.2K</p>
+                <p className="text-white text-2xl font-bold">
+                  ${coreYield.portfolioData.totalValue || '0'}
+                </p>
               </div>
             </div>
 

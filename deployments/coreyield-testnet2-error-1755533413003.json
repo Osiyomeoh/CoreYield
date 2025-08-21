@@ -1,0 +1,23 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-18T16:06:12.269Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {
+    "MockDualCORE": "0x18582B7F11afD41895B31872a1e76d2F678ac648",
+    "MockStCORE": "0x2FF6fD9565F087706C821e007a135739A4271cB5",
+    "CoreStaking": "0x0eD255a4D50e05Cf170ac91B789ec46087C013E2",
+    "CoreSwapAMM": "0xfa252d3693193b32A9A74D06f07d18575CdE8017",
+    "PortfolioTracker": "0xc868b3c69eeBb1232Fba80CeB61305285Ab95C59",
+    "YieldHarvester": "0x245657254f72ADD9eCc29480b507a75FBf505aD6",
+    "RiskManager": "0x92225249b4935Cd38109C0A4B4d926724E2B9d2B",
+    "CoreGovernance": "0xBa2077D192a5E3367512465356A4632F7065Cd2b",
+    "AnalyticsEngine": "0x9431ce0af948cf34e4Ad2f01a2ff9e900adBEFf5",
+    "CoreYieldStrategy": "0xfDAb3C6f69DB461f2Ca73e5031Bd0d0C9d8F2225",
+    "CoreYieldBridge": "0xd4E9b77C7AAAd2F7116a96e5C0B735c80Ba69A3E",
+    "CoreYieldRouter": "0xe6fBFDEFcDd195C931E933E2b828Bccf2783e051"
+  },
+  "verification": {},
+  "testResults": {},
+  "error": "execution reverted: Pool not found",
+  "stack": "ProviderError: execution reverted: Pool not found\n    at HttpProvider.request (/Users/MAC/Downloads/CoreYield/node_modules/hardhat/src/internal/core/providers/http.ts:116:21)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async HardhatEthersProvider.estimateGas (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/internal/hardhat-ethers-provider.ts:246:27)\n    at async /Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:335:35\n    at async Promise.all (index 0)\n    at async HardhatEthersSigner._sendUncheckedTransaction (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:356:7)\n    at async HardhatEthersSigner.sendTransaction (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:181:18)\n    at async send (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/contract.ts:313:20)\n    at async Proxy.addLiquidity (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/contract.ts:352:16)\n    at async main (/Users/MAC/Downloads/CoreYield/scripts/deploy-testnet.ts:237:5)"
+}

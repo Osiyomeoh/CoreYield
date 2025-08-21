@@ -634,9 +634,9 @@ Always diversify your investments and never invest more than you can afford to l
             <div className="flex items-center space-x-8">
               {isStandalone && onBackToLanding && (
                 <button onClick={onBackToLanding} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-teal-500 rounded-2xl flex items-center justify-center">
-                    <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6" />
-                  </div>
+                                      <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center border border-gray-700">
+                      <img src="/logo2.png" alt="CoreYield" className="w-6 h-6" />
+                    </div>
                   <span className="text-white font-semibold text-xl">CoreYield</span>
                 </button>
               )}

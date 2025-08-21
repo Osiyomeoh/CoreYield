@@ -1,4 +1,11 @@
 import React from 'react'
+import { useCoreYield } from '../hooks/useCoreYield'
+import { useReadContract } from 'wagmi'
+import { CONTRACTS } from '../../contracts/addresses'
+import CoreYieldRouterABI from '../abis/CoreYieldRouter.json'
+import CoreStakingABI from '../abis/CoreStaking.json'
+import AnalyticsEngineABI from '../abis/AnalyticsEngine.json'
+import { formatUnits } from 'viem'
 
 interface FooterProps {
   variant?: 'landing' | 'dashboard' | 'education' | 'social' | 'documentation' | 'mobile'
@@ -7,6 +14,51 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ variant = 'landing', onOpenCalculator }) => {
   const currentYear = new Date().getFullYear()
+  const coreYield = useCoreYield()
+
+  // Get real protocol stats from contracts
+  const { data: protocolStats } = useReadContract({
+    address: CONTRACTS.CORE_YIELD_ROUTER as `0x${string}`,
+    abi: CoreYieldRouterABI.abi as any,
+    functionName: 'getProtocolStats',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Get real staking stats
+  const { data: stakingStats } = useReadContract({
+    address: CONTRACTS.CORE_STAKING as `0x${string}`,
+    abi: CoreStakingABI.abi as any,
+    functionName: 'getStakingStats',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Get real analytics data
+  const { data: analyticsData } = useReadContract({
+    address: CONTRACTS.ANALYTICS_ENGINE as `0x${string}`,
+    abi: AnalyticsEngineABI.abi as any,
+    functionName: 'getGlobalAnalytics',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Dynamic footer stats based on real contract data
+  const footerStats = [
+    {
+      value: protocolStats?.[0] ? `$${formatUnits(protocolStats[0] as bigint, 18)}+` : '$0+',
+      label: 'Total Value Locked'
+    },
+    {
+      value: stakingStats?.[0] ? `${Number(formatUnits(stakingStats[0] as bigint, 2))}%` : '0%',
+      label: 'Average APY'
+    },
+    {
+      value: protocolStats?.[2] ? `${Number(protocolStats[2])}+` : '0+',
+      label: 'Active Users'
+    },
+    {
+      value: '99.9%',
+      label: 'Uptime'
+    }
+  ]
 
   const footerLinks = {
     product: [
@@ -71,9 +123,9 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'landing', onOpenCalcu
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-teal-500 rounded-2xl flex items-center justify-center">
-                <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
-              </div>
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 rounded-2xl flex items-center justify-center border border-gray-700">
+                  <img src="/logo2.png" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
+                </div>
               <div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white">CoreYield</h3>
                 <p className="text-gray-400 text-xs sm:text-sm">Next-Generation Yield Protocol</p>
@@ -188,22 +240,12 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'landing', onOpenCalcu
         {/* Stats Section - Only for landing page */}
         {variant === 'landing' && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 p-8 bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-2xl border border-gray-700/50">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">$2.4M+</div>
-              <div className="text-gray-400 text-sm">Total Value Locked</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">15%</div>
-              <div className="text-gray-400 text-sm">Average APY</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">1,200+</div>
-              <div className="text-gray-400 text-sm">Active Users</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">99.9%</div>
-              <div className="text-gray-400 text-sm">Uptime</div>
-            </div>
+            {footerStats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <div className="text-3xl font-bold text-white mb-2">{stat.value}</div>
+                <div className="text-gray-400 text-sm">{stat.label}</div>
+              </div>
+            ))}
           </div>
         )}
 

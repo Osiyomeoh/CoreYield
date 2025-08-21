@@ -1,0 +1,18 @@
+{
+  "network": "localhost",
+  "timestamp": "2025-08-18T13:59:30.758Z",
+  "contracts": {
+    "coreYieldRouter": "0xd9140951d8aE6E5F625a02F5908535e16e3af964",
+    "coreStaking": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
+    "coreSwapAMM": "0x12Bcb546bC60fF39F1Adfc7cE4605d5Bd6a6A876",
+    "portfolioTracker": "0xaC47e91215fb80462139756f43438402998E4A3a",
+    "yieldHarvester": "0x9BcC604D4381C5b0Ad12Ff3Bf32bEdE063416BC7",
+    "riskManager": "0x63fea6E447F120B8Faf85B53cdaD8348e645D80E",
+    "coreGovernance": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b",
+    "analyticsEngine": "0xaC9fCBA56E42d5960f813B9D0387F3D3bC003338",
+    "coreYieldStrategy": "0x38A70c040CA5F5439ad52d0e821063b0EC0B52b6",
+    "coreYieldBridge": "0xf090f16dEc8b6D24082Edd25B1C8D26f2bC86128",
+    "mockCoreToken": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
+    "mockStCoreToken": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F"
+  }
+}

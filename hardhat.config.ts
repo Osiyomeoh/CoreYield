@@ -31,6 +31,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 1337
     },
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      chainId: 1337
+    },
     coreTestnet: {
       url: "https://rpc.test2.btcs.network",
       chainId: 1114,

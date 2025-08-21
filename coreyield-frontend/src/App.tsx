@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Web3Provider } from './providers/Web3Provider'
 
+import { LoadingScreen } from './components/shared/LoadingScreen'
 import { LandingPage } from './components/LandingPage'
-import { MainDashboard } from './components/MainDashboard'
+import { MainDashboard } from './components/dashboard/MainDashboard'
 import { Education } from './components/Education'
-import { Footer } from './components/Footer'
+import { Footer } from './components/shared/Footer'
 import { Calculator } from './components/Calculator'
 import { MobileMenu } from './components/MobileMenu'
 import { Analytics } from './components/Analytics'
@@ -14,7 +15,6 @@ import { WhaleAlerts } from './components/WhaleAlerts'
 import { SocialFeatures } from './components/SocialFeatures'
 import { Documentation } from './components/Documentation'
 import { MobileOptimization } from './components/MobileOptimization'
-
 
 type ViewType = 'landing' | 'dashboard' | 'education' | 'social' | 'documentation' | 'mobile'
 
@@ -25,17 +25,27 @@ function App() {
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [showInfoBot, setShowInfoBot] = useState(false)
   const [showWhaleAlerts, setShowWhaleAlerts] = useState(false)
+  
+  // Loading screen state
+  const [isLoading, setIsLoading] = useState(true)
+  const [appLaunched, setAppLaunched] = useState(false)
 
   const handleLaunchApp = () => {
     setCurrentView('dashboard')
+    setAppLaunched(true)
+  }
+
+  const handleLoadingComplete = () => {
+    setIsLoading(false)
   }
 
   const handleBackToLanding = () => {
     setCurrentView('landing')
   }
 
-  const handleShowEducation = () => {
+  const handleShowEducation = (level?: 'beginner' | 'intermediate' | 'advanced') => {
     setCurrentView('education')
+    // You can use the level parameter if needed for Education component
   }
 
   const handleOpenCalculator = () => {
@@ -45,7 +55,6 @@ function App() {
   const handleCloseCalculator = () => {
     setShowCalculator(false)
   }
-
 
   const handleOpenAnalytics = () => {
     setShowAnalytics(true)
@@ -77,22 +86,29 @@ function App() {
     setMobileMenuOpen(false)
   }
 
-    return (
+  return (
     <Web3Provider>
+      {/* Loading Screen - Shows first */}
+      <LoadingScreen 
+        isVisible={isLoading} 
+        onComplete={handleLoadingComplete} 
+      />
+      
       <div className="min-h-screen flex flex-col">
         <Toaster position="bottom-right" />
         
         {currentView === 'landing' ? (
           <div className="flex-1">
-            <LandingPage onLaunchApp={handleLaunchApp} onShowEducation={handleShowEducation} />
+            <LandingPage 
+              onLaunchApp={handleLaunchApp} 
+              onShowEducation={handleShowEducation}
+            />
           </div>
         ) : (
           <div className="flex-1">
             {currentView === 'dashboard' && (
               <MainDashboard 
-                onBackToLanding={handleBackToLanding} 
                 onShowEducation={handleShowEducation}
-                onOpenMobileMenu={() => setMobileMenuOpen(true)}
               />
             )}
             {currentView === 'education' && (
@@ -131,7 +147,8 @@ function App() {
           />
         )}
         
-        <Footer variant={currentView} onOpenCalculator={handleOpenCalculator} />
+        {/* Footer - Only shows on landing page, not in main app */}
+        <Footer isVisible={currentView === 'landing'} />
         
         {showCalculator && (
           <Calculator onClose={handleCloseCalculator} />

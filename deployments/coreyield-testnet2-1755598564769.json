@@ -1,0 +1,53 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-19T10:16:04.769Z",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "contracts": {
+    "MockDualCORE": "0x5c74c94173F05dA1720953407cbb920F3DF9f887",
+    "MockStCORE": "0x720472c8ce72c2A2D711333e064ABD3E6BbEAdd3",
+    "MockLstBTC": "0xe8D2A1E88c91DCd5433208d4152Cc4F399a7e91d",
+    "CoreYieldMarketFactory": "0xCace1b78160AE76398F486c8a18044da0d66d86D",
+    "CoreYieldTokenOperations": "0xD5ac451B0c50B9476107823Af206eD814a2e2580",
+    "CoreYieldAnalytics": "0xF8e31cb472bc70500f08Cd84917E5A1912Ec8397",
+    "CoreYieldAMM": "0xc0F115A19107322cFBf1cDBC7ea011C19EbDB4F8",
+    "CoreStaking": "0xc96304e3c037f81dA488ed9dEa1D8F2a48278a75",
+    "PortfolioTracker": "0x34B40BA116d5Dec75548a9e9A8f15411461E8c70",
+    "YieldHarvester": "0xD0141E899a65C95a556fE2B27e5982A6DE7fDD7A",
+    "RiskManager": "0x07882Ae1ecB7429a84f1D53048d35c4bB2056877",
+    "CoreGovernance": "0x22753E4264FDDc6181dc7cce468904A80a363E44",
+    "AnalyticsEngine": "0xA7c59f010700930003b33aB25a7a0679C860f29c",
+    "CoreYieldStrategy": "0xfaAddC93baf78e89DCf37bA67943E1bE8F37Bb8c",
+    "CoreYieldBridge": "0x276C216D241856199A83bf27b2286659e5b877D3",
+    "CoreYieldRouter": "0x3347B4d90ebe72BeFb30444C9966B2B990aE9FcB"
+  },
+  "markets": {
+    "dualCORE": {
+      "underlying": "0x5c74c94173F05dA1720953407cbb920F3DF9f887",
+      "syToken": "0x3838c6D296C855D311572EbD7256527FA982Ff13",
+      "ptToken": "0x57AA5A3d473b08e2b594D3C6dd19dC39d22ab3e2",
+      "ytToken": "0x05052c7Ae7E15BCFe983506B2EeBD691895Fe8bC",
+      "maturity": 1790162317
+    },
+    "stCORE": {
+      "underlying": "0x720472c8ce72c2A2D711333e064ABD3E6BbEAdd3",
+      "syToken": "0x7f01274221ba4a8EdBB7255b01FdC8c3F51CFf9E",
+      "ptToken": "0x2412Ac0dd42e922627453D73D788Dd9d2Eb6c2b3",
+      "ytToken": "0xf53B9A5131d91aE41d74b113a986f496455fB419",
+      "maturity": 1790162317
+    },
+    "lstBTC": {
+      "underlying": "0xe8D2A1E88c91DCd5433208d4152Cc4F399a7e91d",
+      "syToken": "0x982f21b2588722F243a5F0A03eA9bA4482dbF873",
+      "ptToken": "0x2e75D3983ecED8928Bd8C78af851987B0cAb63F9",
+      "ytToken": "0xf59d79412Ae29fbD05fF9a6116507bAAA8b2feC2",
+      "maturity": 1790162317
+    }
+  },
+  "verification": {},
+  "testResults": {
+    "staking": false,
+    "swapping": false,
+    "portfolioTracking": false,
+    "emergencyFunctions": false
+  }
+}

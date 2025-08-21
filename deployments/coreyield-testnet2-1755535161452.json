@@ -1,0 +1,26 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-18T16:33:20.792Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {
+    "MockDualCORE": "0x1fe692f330Ad13911127cA5619611Aa914310122",
+    "MockStCORE": "0x92535aBF6A7d9af69335cAc4419f0EFEa3a23990",
+    "CoreStaking": "0xa8356576b87C68e70068D79d133cf6AF3D0E6Ed0",
+    "CoreSwapAMM": "0xBC1E9684BB899a8EBADe110F5ab53A78Eb137296",
+    "PortfolioTracker": "0x76149bE78c9e647f1a53a5C4b265b5Def960012F",
+    "YieldHarvester": "0x81faFf22cAe79E8fb7b3E19Ba6E853db982FF2Fa",
+    "RiskManager": "0x2FEef6575678352CcefBFAdc3410cD3d9847C4B8",
+    "CoreGovernance": "0x0Cd0a7d05fb7062C8baCbdCDfc137F83B18D9807",
+    "AnalyticsEngine": "0x580d8efb751a0f554dBB6E725612ce4CA74A1e66",
+    "CoreYieldStrategy": "0x7E7aC41B6127d6bB70ceC53738f9C803d565B716",
+    "CoreYieldBridge": "0xb211F8ac6b29D45b545E6183772E883860909210",
+    "CoreYieldRouter": "0xBa9D08A877c4e44217B5C70fC97355146Fc87265"
+  },
+  "verification": {},
+  "testResults": {
+    "staking": false,
+    "swapping": false,
+    "portfolioTracking": true,
+    "emergencyFunctions": true
+  }
+}

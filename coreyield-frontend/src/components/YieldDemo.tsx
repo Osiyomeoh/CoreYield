@@ -25,7 +25,7 @@ export const YieldDemo: React.FC<YieldDemoProps> = ({
   formatBalance,
   onAddYieldSnapshot
 }) => {
-  const [yieldAmount, setYieldAmount] = useState('0.1')
+  const [yieldAmount, setYieldAmount] = useState('0.01')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const hasPTTokens = ptBalance && ptBalance > 0n

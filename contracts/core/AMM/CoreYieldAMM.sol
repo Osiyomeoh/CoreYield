@@ -1,327 +1,543 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "../../interfaces/ICoreYieldFactory.sol";
-import "../libraries/LibYieldMath.sol";
+import "../CoreYieldAnalytics.sol";
 
-/**
- * @title CoreYieldAMM
- * @notice Automated Market Maker for CoreYield PT/YT token pairs
- * @dev Implements constant product AMM with yield-adjusted pricing
- */
 contract CoreYieldAMM is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
-    
+
+    // Pool structure
     struct Pool {
-        address syToken;
-        address ptToken;
-        address ytToken;
-        uint256 ptReserves;
-        uint256 ytReserves;
-        uint256 totalLiquidity;
-        uint256 lastUpdate;
-        bool active;
+        address token0;
+        address token1;
+        uint256 reserve0;
+        uint256 reserve1;
+        uint256 totalSupply;
+        bool isYieldPool;
+        bool isActive;
+        uint256 lastUpdateTime;
+        uint256 cumulativeYield0;
+        uint256 cumulativeYield1;
+        uint256 fee0;
+        uint256 fee1;
+        uint256 tradingFee;          // Trading fee for this pool
+        uint256 yieldMultiplier;     // Yield adjustment factor
+        uint256 volatilityIndex;     // Market volatility measure
+        uint256 lastPriceUpdate;     // Last price update timestamp
     }
-    
-    struct LiquidityPosition {
-        uint256 liquidity;
-        uint256 ptAmount;
-        uint256 ytAmount;
-        uint256 lastClaim;
+
+    // Fee structure
+    struct FeeConfig {
+        uint256 tradingFee;           // Trading fee (basis points)
+        uint256 yieldFee;             // Yield fee (basis points)
+        uint256 liquidityFee;         // Liquidity fee (basis points)
+        uint256 slippageTolerance;    // Slippage tolerance (basis points)
+        uint256 dynamicFeeMultiplier; // Dynamic fee adjustment
+        address feeCollector;         // Fee collector address
     }
-    
-    event PoolCreated(address indexed syToken, address indexed ptToken, address indexed ytToken);
-    event LiquidityAdded(address indexed user, address indexed syToken, uint256 ptAmount, uint256 ytAmount, uint256 liquidity);
-    event LiquidityRemoved(address indexed user, address indexed syToken, uint256 ptAmount, uint256 ytAmount, uint256 liquidity);
-    event SwapExecuted(address indexed user, address indexed syToken, bool ptToYt, uint256 amountIn, uint256 amountOut, uint256 fee);
-    event FeesCollected(address indexed syToken, uint256 ptFees, uint256 ytFees);
-    
-    mapping(address => Pool) public pools;
-    mapping(address => mapping(address => LiquidityPosition)) public userPositions;
-    mapping(address => bool) public supportedSYTokens;
-    
-    uint256 public constant FEE_DENOMINATOR = 10000;
-    uint256 public swapFee = 30;
-    uint256 public protocolFee = 10;
-    address public feeRecipient;
-    
-    ICoreYieldFactory public immutable coreYieldFactory;
-    
-    constructor(address _coreYieldFactory, address _feeRecipient) Ownable(msg.sender) {
-        require(_coreYieldFactory != address(0), "Invalid factory address");
-        require(_feeRecipient != address(0), "Invalid fee recipient");
-        
-        coreYieldFactory = ICoreYieldFactory(_coreYieldFactory);
-        feeRecipient = _feeRecipient;
+
+    // Yield tracking
+    struct YieldInfo {
+        uint256 currentAPY;
+        uint256 historicalAPY;
+        uint256 yieldAccrued;
+        uint256 lastUpdateTime;
+        bool isStable;
+        uint256 yieldVolatility;      // Yield volatility measure
+        uint256 marketEfficiency;     // Market efficiency score
     }
+
+    // Advanced trading structure
+    struct TradeInfo {
+        uint256 inputAmount;
+        uint256 outputAmount;
+        uint256 fee;
+        uint256 slippage;
+        uint256 yieldAdjustment;
+        uint256 priceImpact;
+        bool isYieldOptimized;
+    }
+
+    // State variables
+    mapping(bytes32 => Pool) public pools;
+    mapping(address => mapping(address => bytes32)) public poolKeys;
+    mapping(address => YieldInfo) public yieldInfo;
+    mapping(bytes32 => uint256) public poolVolumes;
+    mapping(bytes32 => uint256) public lastVolumeUpdate;
     
-    /**
-     * @notice Create a new AMM pool for PT/YT tokens
-     * @param syToken SY token address
-     * @param initialPTAmount Initial PT token amount
-     * @param initialYTAmount Initial YT token amount
-     */
+    // Analytics integration
+    CoreYieldAnalytics public analytics;
+    
+    // Configuration
+    uint256 public constant BASIS_POINTS = 10000;
+    uint256 public constant MIN_LIQUIDITY = 1000; // 0.0001 tokens
+    uint256 public constant MAX_FEE = 500; // 5%
+    uint256 public constant YIELD_UPDATE_INTERVAL = 1 hours;
+    uint256 public constant VOLATILITY_WINDOW = 24 hours;
+    
+    // Events
+    event PoolCreated(
+        bytes32 indexed poolKey,
+        address indexed token0,
+        address indexed token1,
+        bool isYieldPool
+    );
+    
+    event LiquidityAdded(
+        bytes32 indexed poolKey,
+        address indexed provider,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 liquidity
+    );
+    
+    event LiquidityRemoved(
+        bytes32 indexed poolKey,
+        address indexed provider,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 liquidity
+    );
+    
+    event Swap(
+        bytes32 indexed poolKey,
+        address indexed sender,
+        address indexed recipient,
+        uint256 amount0In,
+        uint256 amount1In,
+        uint256 amount0Out,
+        uint256 amount1Out,
+        uint256 fee,
+        uint256 yieldAdjustment
+    );
+    
+    event YieldUpdated(
+        address indexed token,
+        uint256 newAPY,
+        uint256 volatility,
+        uint256 marketEfficiency
+    );
+
+    constructor() Ownable(msg.sender) {}
+
+    // Set analytics contract
+    function setAnalytics(address _analytics) external onlyOwner {
+        analytics = CoreYieldAnalytics(_analytics);
+    }
+
+    // Create a new pool
     function createPool(
-        address syToken,
-        uint256 initialPTAmount,
-        uint256 initialYTAmount
-    ) external onlyOwner {
-        require(syToken != address(0), "Invalid SY token");
-        require(!pools[syToken].active, "Pool already exists");
-        require(initialPTAmount > 0 && initialYTAmount > 0, "Invalid amounts");
+        address _token0,
+        address _token1,
+        bool _isYieldPool
+    ) external onlyOwner returns (bytes32 poolKey) {
+        require(_token0 != _token1, "Identical tokens");
+        require(_token0 != address(0) && _token1 != address(0), "Zero address");
         
-        ICoreYieldFactory.Market memory market = coreYieldFactory.getMarket(syToken);
-        require(market.active, "Market not active");
+        // Sort tokens
+        (address token0, address token1) = _token0 < _token1 ? 
+            (_token0, _token1) : (_token1, _token0);
         
-        pools[syToken] = Pool({
-            syToken: syToken,
-            ptToken: market.ptToken,
-            ytToken: market.ytToken,
-            ptReserves: initialPTAmount,
-            ytReserves: initialYTAmount,
-            totalLiquidity: Math.sqrt(initialPTAmount * initialYTAmount),
-            lastUpdate: block.timestamp,
-            active: true
+        poolKey = keccak256(abi.encodePacked(token0, token1));
+        require(pools[poolKey].token0 == address(0), "Pool exists");
+        
+        pools[poolKey] = Pool({
+            token0: token0,
+            token1: token1,
+            reserve0: 0,
+            reserve1: 0,
+            totalSupply: 0,
+            isYieldPool: _isYieldPool,
+            isActive: true,
+            lastUpdateTime: block.timestamp,
+            cumulativeYield0: 0,
+            cumulativeYield1: 0,
+            fee0: 0,
+            fee1: 0,
+            tradingFee: 30, // 0.3% default trading fee
+            yieldMultiplier: _isYieldPool ? 1200 : 1000, // 20% premium for yield pools
+            volatilityIndex: 1000, // Base volatility
+            lastPriceUpdate: block.timestamp
         });
         
-        supportedSYTokens[syToken] = true;
+        poolKeys[token0][token1] = poolKey;
+        poolKeys[token1][token0] = poolKey;
         
-        IERC20(market.ptToken).safeTransferFrom(msg.sender, address(this), initialPTAmount);
-        IERC20(market.ytToken).safeTransferFrom(msg.sender, address(this), initialYTAmount);
-        
-        emit PoolCreated(syToken, market.ptToken, market.ytToken);
+        emit PoolCreated(poolKey, token0, token1, _isYieldPool);
     }
-    
-    /**
-     * @notice Add liquidity to a pool
-     * @param syToken SY token address
-     * @param ptAmount PT token amount to add
-     * @param ytAmount YT token amount to add
-     * @param minLiquidity Minimum liquidity tokens to receive
-     */
+
+    // Add liquidity to a pool
     function addLiquidity(
-        address syToken,
-        uint256 ptAmount,
-        uint256 ytAmount,
-        uint256 minLiquidity
+        address _token0,
+        address _token1,
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 _minLiquidity
     ) external nonReentrant returns (uint256 liquidity) {
-        Pool storage pool = pools[syToken];
-        require(pool.active, "Pool not active");
-        require(ptAmount > 0 && ytAmount > 0, "Invalid amounts");
+        bytes32 poolKey = poolKeys[_token0][_token1];
+        require(poolKey != bytes32(0), "Pool not found");
         
-        uint256 ptReserves = pool.ptReserves;
-        uint256 ytReserves = pool.ytReserves;
+        Pool storage pool = pools[poolKey];
+        require(pool.isActive, "Pool not active");
         
-        if (pool.totalLiquidity == 0) {
-            liquidity = Math.sqrt(ptAmount * ytAmount);
+        // Sort amounts and tokens
+        (uint256 amount0, uint256 amount1) = _token0 < _token1 ? 
+            (_amount0, _amount1) : (_amount1, _amount0);
+        (address token0, address token1) = _token0 < _token1 ? 
+            (_token0, _token1) : (_token1, _token0);
+        
+        uint256 _reserve0 = pool.reserve0;
+        uint256 _reserve1 = pool.reserve1;
+        
+        if (_reserve0 == 0 && _reserve1 == 0) {
+            // First liquidity
+            liquidity = Math.sqrt(amount0 * amount1) - MIN_LIQUIDITY;
+            pool.totalSupply = MIN_LIQUIDITY;
         } else {
-            uint256 liquidityPT = (ptAmount * pool.totalLiquidity) / ptReserves;
-            uint256 liquidityYT = (ytAmount * pool.totalLiquidity) / ytReserves;
-            liquidity = Math.min(liquidityPT, liquidityYT);
+            // Subsequent liquidity
+            liquidity = Math.min(
+                (amount0 * pool.totalSupply) / _reserve0,
+                (amount1 * pool.totalSupply) / _reserve1
+            );
         }
         
-        require(liquidity >= minLiquidity, "Insufficient liquidity");
+        require(liquidity >= _minLiquidity, "Insufficient liquidity");
         
-        pool.ptReserves += ptAmount;
-        pool.ytReserves += ytAmount;
-        pool.totalLiquidity += liquidity;
-        pool.lastUpdate = block.timestamp;
+        // Transfer tokens
+        IERC20(_token0).safeTransferFrom(msg.sender, address(this), _amount0);
+        IERC20(_token1).safeTransferFrom(msg.sender, address(this), _amount1);
         
-        LiquidityPosition storage position = userPositions[syToken][msg.sender];
-        position.liquidity += liquidity;
-        position.ptAmount += ptAmount;
-        position.ytAmount += ytAmount;
-        position.lastClaim = block.timestamp;
+        // Update reserves
+        pool.reserve0 = _reserve0 + amount0;
+        pool.reserve1 = _reserve1 + amount1;
+        pool.totalSupply += liquidity;
+        pool.lastUpdateTime = block.timestamp;
         
-        IERC20(pool.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount);
-        IERC20(pool.ytToken).safeTransferFrom(msg.sender, address(this), ytAmount);
+        // Mint LP tokens
+        _mint(msg.sender, liquidity);
         
-        emit LiquidityAdded(msg.sender, syToken, ptAmount, ytAmount, liquidity);
+        // Update yield info if this is a yield pool
+        if (pool.isYieldPool) {
+            _updateYieldInfo(token0, token1);
+        }
+        
+        emit LiquidityAdded(poolKey, msg.sender, amount0, amount1, liquidity);
     }
-    
-    /**
-     * @notice Remove liquidity from a pool
-     * @param syToken SY token address
-     * @param liquidity Liquidity tokens to burn
-     * @param minPTAmount Minimum PT tokens to receive
-     * @param minYTAmount Minimum YT tokens to receive
-     */
+
+    // Remove liquidity from a pool
     function removeLiquidity(
-        address syToken,
-        uint256 liquidity,
-        uint256 minPTAmount,
-        uint256 minYTAmount
-    ) external nonReentrant returns (uint256 ptAmount, uint256 ytAmount) {
-        Pool storage pool = pools[syToken];
-        require(pool.active, "Pool not active");
+        address _token0,
+        address _token1,
+        uint256 _liquidity
+    ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+        bytes32 poolKey = poolKeys[_token0][_token1];
+        require(poolKey != bytes32(0), "Pool not found");
         
-        LiquidityPosition storage position = userPositions[syToken][msg.sender];
-        require(position.liquidity >= liquidity, "Insufficient liquidity");
+        Pool storage pool = pools[poolKey];
+        require(pool.isActive, "Pool not active");
+        require(_liquidity > 0, "Invalid liquidity");
         
-        ptAmount = (liquidity * pool.ptReserves) / pool.totalLiquidity;
-        ytAmount = (liquidity * pool.ytReserves) / pool.totalLiquidity;
+        // Sort tokens
+        (address token0, address token1) = _token0 < _token1 ? 
+            (_token0, _token1) : (_token1, _token0);
         
-        require(ptAmount >= minPTAmount, "Insufficient PT amount");
-        require(ytAmount >= minYTAmount, "Insufficient YT amount");
+        uint256 _reserve0 = pool.reserve0;
+        uint256 _reserve1 = pool.reserve1;
         
-        pool.ptReserves -= ptAmount;
-        pool.ytReserves -= ytAmount;
-        pool.totalLiquidity -= liquidity;
-        pool.lastUpdate = block.timestamp;
+        // Calculate amounts
+        amount0 = (_liquidity * _reserve0) / pool.totalSupply;
+        amount1 = (_liquidity * _reserve1) / pool.totalSupply;
         
-        position.liquidity -= liquidity;
-        position.ptAmount -= ptAmount;
-        position.ytAmount -= ytAmount;
+        require(amount0 > 0 && amount1 > 0, "Insufficient liquidity burned");
         
-        IERC20(pool.ptToken).safeTransfer(msg.sender, ptAmount);
-        IERC20(pool.ytToken).safeTransfer(msg.sender, ytAmount);
+        // Burn LP tokens
+        _burn(msg.sender, _liquidity);
         
-        emit LiquidityRemoved(msg.sender, syToken, ptAmount, ytAmount, liquidity);
+        // Update reserves
+        pool.reserve0 = _reserve0 - amount0;
+        pool.reserve1 = _reserve1 - amount1;
+        pool.totalSupply -= _liquidity;
+        pool.lastUpdateTime = block.timestamp;
+        
+        // Transfer tokens
+        IERC20(token0).safeTransfer(msg.sender, amount0);
+        IERC20(token1).safeTransfer(msg.sender, amount1);
+        
+        emit LiquidityRemoved(poolKey, msg.sender, amount0, amount1, _liquidity);
     }
-    
-    /**
-     * @notice Swap PT tokens for YT tokens
-     * @param syToken SY token address
-     * @param ptAmountIn PT tokens to swap
-     * @param minYTAmountOut Minimum YT tokens to receive
-     */
-    function swapPTForYT(
-        address syToken,
-        uint256 ptAmountIn,
-        uint256 minYTAmountOut
-    ) external nonReentrant returns (uint256 ytAmountOut) {
-        require(ptAmountIn > 0, "Invalid input amount");
+
+    // Swap tokens with yield-adjusted pricing
+    function swap(
+        address _tokenIn,
+        address _tokenOut,
+        uint256 _amountIn,
+        uint256 _minAmountOut,
+        address _recipient
+    ) external nonReentrant returns (uint256 amountOut) {
+        bytes32 poolKey = poolKeys[_tokenIn][_tokenOut];
+        require(poolKey != bytes32(0), "Pool not found");
         
-        ytAmountOut = _swap(syToken, true, ptAmountIn, minYTAmountOut);
+        Pool storage pool = pools[poolKey];
+        require(pool.isActive, "Pool not active");
+        require(_amountIn > 0, "Invalid amount");
         
-        emit SwapExecuted(msg.sender, syToken, true, ptAmountIn, ytAmountOut, swapFee);
-    }
-    
-    /**
-     * @notice Swap YT tokens for PT tokens
-     * @param syToken SY token address
-     * @param ytAmountIn YT tokens to swap
-     * @param minPTAmountOut Minimum PT tokens to receive
-     */
-    function swapYTForPT(
-        address syToken,
-        uint256 ytAmountIn,
-        uint256 minPTAmountOut
-    ) external nonReentrant returns (uint256 ptAmountOut) {
-        require(ytAmountIn > 0, "Invalid input amount");
+        // Sort tokens
+        (address token0, address token1) = _tokenIn < _tokenOut ? 
+            (_tokenIn, _tokenOut) : (_tokenOut, _tokenIn);
         
-        ptAmountOut = _swap(syToken, false, ytAmountIn, minPTAmountOut);
+        uint256 _reserve0 = pool.reserve0;
+        uint256 _reserve1 = pool.reserve1;
         
-        emit SwapExecuted(msg.sender, syToken, false, ytAmountIn, ptAmountOut, swapFee);
-    }
-    
-    /**
-     * @notice Internal swap function
-     * @param syToken SY token address
-     * @param ptToYt True if swapping PT to YT, false otherwise
-     * @param amountIn Input token amount
-     * @param minAmountOut Minimum output amount
-     */
-    function _swap(
-        address syToken,
-        bool ptToYt,
-        uint256 amountIn,
-        uint256 minAmountOut
-    ) internal returns (uint256 amountOut) {
-        Pool storage pool = pools[syToken];
-        require(pool.active, "Pool not active");
+        // Calculate output amount with yield adjustment
+        amountOut = _getAmountOut(_amountIn, _reserve0, _reserve1, pool);
         
-        uint256 inputReserve = ptToYt ? pool.ptReserves : pool.ytReserves;
-        uint256 outputReserve = ptToYt ? pool.ytReserves : pool.ptReserves;
+        require(amountOut >= _minAmountOut, "Insufficient output");
         
-        uint256 feeAmount = (amountIn * swapFee) / FEE_DENOMINATOR;
-        uint256 amountInAfterFee = amountIn - feeAmount;
+        // Calculate fees
+        uint256 fee = _calculateDynamicFee(_amountIn, pool);
+        uint256 yieldAdjustment = _calculateYieldAdjustment(_tokenIn, _tokenOut, pool);
         
-        amountOut = (amountInAfterFee * outputReserve) / (inputReserve + amountInAfterFee);
-        
-        require(amountOut >= minAmountOut, "Insufficient output amount");
-        require(amountOut < outputReserve, "Insufficient liquidity");
-        
-        if (ptToYt) {
-            pool.ptReserves += amountIn;
-            pool.ytReserves -= amountOut;
-        } else {
-            pool.ytReserves += amountIn;
-            pool.ptReserves -= amountOut;
+        // Apply yield adjustment
+        if (yieldAdjustment > 0) {
+            amountOut = amountOut + (amountOut * yieldAdjustment) / BASIS_POINTS;
         }
         
-        pool.lastUpdate = block.timestamp;
+        // Transfer input tokens
+        IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
         
-        address inputToken = ptToYt ? pool.ptToken : pool.ytToken;
-        address outputToken = ptToYt ? pool.ytToken : pool.ptToken;
+        // Transfer output tokens
+        IERC20(_tokenOut).safeTransfer(_recipient, amountOut);
         
-        IERC20(inputToken).safeTransferFrom(msg.sender, address(this), amountIn);
-        IERC20(outputToken).safeTransfer(msg.sender, amountOut);
+        // Update reserves
+        if (_tokenIn < _tokenOut) {
+            pool.reserve0 = _reserve0 + _amountIn;
+            pool.reserve1 = _reserve1 - amountOut;
+        } else {
+            pool.reserve0 = _reserve0 - amountOut;
+            pool.reserve1 = _reserve1 + _amountIn;
+        }
         
-        return amountOut;
-    }
-    
-    /**
-     * @notice Get current pool reserves
-     * @param syToken SY token address
-     */
-    function getPoolReserves(address syToken) external view returns (uint256 ptReserves, uint256 ytReserves) {
-        Pool storage pool = pools[syToken];
-        return (pool.ptReserves, pool.ytReserves);
-    }
-    
-    /**
-     * @notice Get swap quote
-     * @param syToken SY token address
-     * @param ptToYt True if swapping PT to YT, false otherwise
-     * @param amountIn Input token amount
-     */
-    function getSwapQuote(
-        address syToken,
-        bool ptToYt,
-        uint256 amountIn
-    ) external view returns (uint256 amountOut, uint256 fee) {
-        Pool storage pool = pools[syToken];
-        require(pool.active, "Pool not active");
+        pool.lastUpdateTime = block.timestamp;
+        pool.lastPriceUpdate = block.timestamp;
         
-        uint256 inputReserve = ptToYt ? pool.ptReserves : pool.ytReserves;
-        uint256 outputReserve = ptToYt ? pool.ytReserves : pool.ptReserves;
+        // Update volume
+        _updateVolume(poolKey, _amountIn);
         
-        fee = (amountIn * swapFee) / FEE_DENOMINATOR;
-        uint256 amountInAfterFee = amountIn - fee;
+        // Update yield info if this is a yield pool
+        if (pool.isYieldPool) {
+            _updateYieldInfo(token0, token1);
+        }
         
-        amountOut = (amountInAfterFee * outputReserve) / (inputReserve + amountInAfterFee);
+        emit Swap(
+            poolKey,
+            msg.sender,
+            _recipient,
+            _tokenIn < _tokenOut ? _amountIn : 0,
+            _tokenIn < _tokenOut ? 0 : _amountIn,
+            _tokenIn < _tokenOut ? 0 : amountOut,
+            _tokenIn < _tokenOut ? amountOut : 0,
+            fee,
+            yieldAdjustment
+        );
     }
-    
-    /**
-     * @notice Update swap fee (owner only)
-     * @param newFee New swap fee in basis points
-     */
-    function updateSwapFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 500, "Fee too high");
-        swapFee = newFee;
+
+    // Get quote for swap
+    function getQuote(
+        address _tokenIn,
+        address _tokenOut,
+        uint256 _amountIn
+    ) external view returns (TradeInfo memory) {
+        bytes32 poolKey = poolKeys[_tokenIn][_tokenOut];
+        require(poolKey != bytes32(0), "Pool not found");
+        
+        Pool storage pool = pools[poolKey];
+        require(pool.isActive, "Pool not active");
+        
+        uint256 _reserve0 = pool.reserve0;
+        uint256 _reserve1 = pool.reserve1;
+        
+        // Calculate base output
+        uint256 outputAmount = _getAmountOut(_amountIn, _reserve0, _reserve1, pool);
+        
+        // Calculate fees
+        uint256 fee = _calculateDynamicFee(_amountIn, pool);
+        uint256 yieldAdjustment = _calculateYieldAdjustment(_tokenIn, _tokenOut, pool);
+        
+        // Apply yield adjustment
+        if (yieldAdjustment > 0) {
+            outputAmount = outputAmount + (outputAmount * yieldAdjustment) / BASIS_POINTS;
+        }
+        
+        // Calculate slippage and price impact
+        uint256 slippage = _calculateSlippage(_amountIn, _reserve0, _reserve1);
+        uint256 priceImpact = _calculatePriceImpact(_amountIn, _reserve0, _reserve1);
+        
+        return TradeInfo({
+            inputAmount: _amountIn,
+            outputAmount: outputAmount,
+            fee: fee,
+            slippage: slippage,
+            yieldAdjustment: yieldAdjustment,
+            priceImpact: priceImpact,
+            isYieldOptimized: pool.isYieldPool
+        });
     }
-    
-    /**
-     * @notice Update protocol fee (owner only)
-     * @param newFee New protocol fee in basis points
-     */
-    function updateProtocolFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 100, "Fee too high");
-        protocolFee = newFee;
+
+    // Internal functions
+
+    function _getAmountOut(
+        uint256 _amountIn,
+        uint256 _reserve0,
+        uint256 _reserve1,
+        Pool storage _pool
+    ) internal view returns (uint256) {
+        require(_amountIn > 0, "Invalid amount");
+        require(_reserve0 > 0 && _reserve1 > 0, "Insufficient liquidity");
+        
+        uint256 amountInWithFee = _amountIn * (BASIS_POINTS - _pool.tradingFee);
+        uint256 numerator = amountInWithFee * _reserve1;
+        uint256 denominator = (_reserve0 * BASIS_POINTS) + amountInWithFee;
+        
+        return numerator / denominator;
     }
-    
-    /**
-     * @notice Update fee recipient (owner only)
-     * @param newRecipient New fee recipient address
-     */
-    function updateFeeRecipient(address newRecipient) external onlyOwner {
-        require(newRecipient != address(0), "Invalid address");
-        feeRecipient = newRecipient;
+
+    function _calculateDynamicFee(
+        uint256 _amountIn,
+        Pool storage _pool
+    ) internal view returns (uint256) {
+        uint256 baseFee = _pool.tradingFee;
+        
+        // Adjust fee based on volatility
+        uint256 volatilityMultiplier = _pool.volatilityIndex / 1000;
+        if (volatilityMultiplier > 1500) { // High volatility
+            baseFee = baseFee * 120 / 100; // 20% increase
+        } else if (volatilityMultiplier < 500) { // Low volatility
+            baseFee = baseFee * 80 / 100; // 20% decrease
+        }
+        
+        return (baseFee * _amountIn) / BASIS_POINTS;
     }
-} 
+
+    function _calculateYieldAdjustment(
+        address _tokenIn,
+        address _tokenOut,
+        Pool storage _pool
+    ) internal view returns (uint256) {
+        if (!_pool.isYieldPool) return 0;
+        
+        // Get yield info from analytics if available
+        if (address(analytics) != address(0)) {
+            try analytics.getMarketMode(_tokenIn) returns (CoreYieldAnalytics.MarketMode mode) {
+                if (mode == CoreYieldAnalytics.MarketMode.CHEAP_PT) {
+                    return 200; // 2% bonus for PT trades
+                } else if (mode == CoreYieldAnalytics.MarketMode.CHEAP_YT) {
+                    return 300; // 3% bonus for YT trades
+                }
+            } catch {
+                // Analytics not available, use default
+            }
+        }
+        
+        // Default yield adjustment based on pool yield multiplier
+        return (_pool.yieldMultiplier - 1000) / 10; // Convert to basis points
+    }
+
+    function _calculateSlippage(
+        uint256 _amountIn,
+        uint256 _reserve0,
+        uint256 _reserve1
+    ) internal pure returns (uint256) {
+        if (_reserve0 == 0 || _reserve1 == 0) return 0;
+        
+        uint256 priceBefore = (_reserve1 * BASIS_POINTS) / _reserve0;
+        uint256 priceAfter = ((_reserve1 * BASIS_POINTS) / (_reserve0 + _amountIn));
+        
+        if (priceBefore > priceAfter) {
+            return ((priceBefore - priceAfter) * BASIS_POINTS) / priceBefore;
+        }
+        return 0;
+    }
+
+    function _calculatePriceImpact(
+        uint256 _amountIn,
+        uint256 _reserve0,
+        uint256 _reserve1
+    ) internal pure returns (uint256) {
+        if (_reserve0 == 0) return 0;
+        
+        return (_amountIn * BASIS_POINTS) / (_reserve0 + _amountIn);
+    }
+
+    function _updateVolume(bytes32 _poolKey, uint256 _amount) internal {
+        poolVolumes[_poolKey] += _amount;
+        lastVolumeUpdate[_poolKey] = block.timestamp;
+    }
+
+    function _updateYieldInfo(address _token0, address _token1) internal {
+        if (address(analytics) == address(0)) return;
+        
+        try analytics.updateAnalytics(_token0) {
+            // Successfully updated analytics for token0
+        } catch {
+            // Analytics update failed
+        }
+        
+        try analytics.updateAnalytics(_token1) {
+            // Successfully updated analytics for token1
+        } catch {
+            // Analytics update failed
+        }
+    }
+
+    // View functions
+    function getPool(bytes32 _poolKey) external view returns (Pool memory) {
+        return pools[_poolKey];
+    }
+
+    function getPoolKey(address _token0, address _token1) external view returns (bytes32) {
+        return poolKeys[_token0][_token1];
+    }
+
+    function getYieldInfo(address _token) external view returns (YieldInfo memory) {
+        return yieldInfo[_token];
+    }
+
+    function getPoolVolume(bytes32 _poolKey) external view returns (uint256) {
+        return poolVolumes[_poolKey];
+    }
+
+    // Admin functions
+    function setPoolActive(bytes32 _poolKey, bool _active) external onlyOwner {
+        pools[_poolKey].isActive = _active;
+    }
+
+    function setTradingFee(bytes32 _poolKey, uint256 _fee) external onlyOwner {
+        require(_fee <= MAX_FEE, "Fee too high");
+        pools[_poolKey].tradingFee = _fee;
+    }
+
+    function setYieldMultiplier(bytes32 _poolKey, uint256 _multiplier) external onlyOwner {
+        require(_multiplier >= 800 && _multiplier <= 2000, "Invalid multiplier");
+        pools[_poolKey].yieldMultiplier = _multiplier;
+    }
+
+    // Emergency functions
+    function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
+        IERC20(_token).safeTransfer(msg.sender, _amount);
+    }
+
+    // Mock mint/burn functions for LP tokens (simplified)
+    function _mint(address _to, uint256 _amount) internal {
+        // In a real implementation, this would mint ERC20 LP tokens
+    }
+
+    function _burn(address _from, uint256 _amount) internal {
+        // In a real implementation, this would burn ERC20 LP tokens
+    }
+}

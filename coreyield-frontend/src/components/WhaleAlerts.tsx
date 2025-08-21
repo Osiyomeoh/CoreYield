@@ -33,7 +33,7 @@ export const WhaleAlerts: React.FC<WhaleAlertsProps> = ({ onClose }) => {
   const [filter, setFilter] = useState<'all' | 'whale' | 'high-impact'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [settings, setSettings] = useState<AlertSettings>({
-    minAmount: 10000,
+    minAmount: 0,
     showDeposits: true,
     showWithdrawals: true,
     showClaims: true,
@@ -42,96 +42,14 @@ export const WhaleAlerts: React.FC<WhaleAlertsProps> = ({ onClose }) => {
     pushEnabled: true
   })
 
-  // Mock data - in real app this would come from blockchain events
-  const [transactions, setTransactions] = useState<WhaleTransaction[]>([
-    {
-      id: '1',
-      type: 'deposit',
-      asset: 'stCORE',
-      amount: 50000,
-      value: 52500,
-      from: '0x1234...5678',
-      to: 'CoreYield Protocol',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
-      isWhale: true,
-      impact: 'high',
-      txHash: '0xabc123...def456'
-    },
-    {
-      id: '2',
-      type: 'claim',
-      asset: 'lstBTC',
-      amount: 12500,
-      value: 13125,
-      from: '0x8765...4321',
-      to: 'User Wallet',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-      isWhale: true,
-      impact: 'medium',
-      txHash: '0xdef456...ghi789'
-    },
-    {
-      id: '3',
-      type: 'withdraw',
-      asset: 'dualCORE',
-      amount: 25000,
-      value: 26250,
-      from: 'CoreYield Protocol',
-      to: '0x9876...5432',
-      timestamp: new Date(Date.now() - 8 * 60 * 1000), // 8 minutes ago
-      isWhale: true,
-      impact: 'high',
-      txHash: '0xghi789...jkl012'
-    },
-    {
-      id: '4',
-      type: 'transfer',
-      asset: 'SY-stCORE',
-      amount: 15000,
-      value: 15750,
-      from: '0x1111...2222',
-      to: '0x3333...4444',
-      timestamp: new Date(Date.now() - 12 * 60 * 1000), // 12 minutes ago
-      isWhale: false,
-      impact: 'low',
-      txHash: '0xjkl012...mno345'
-    },
-    {
-      id: '5',
-      type: 'deposit',
-      asset: 'lstBTC',
-      amount: 75000,
-      value: 78750,
-      from: '0x5555...6666',
-      to: 'CoreYield Protocol',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-      isWhale: true,
-      impact: 'high',
-      txHash: '0xmno345...pqr678'
-    }
-  ])
+  // TODO: Replace with real data from blockchain events
+  const [transactions, setTransactions] = useState<WhaleTransaction[]>([])
 
-  // Simulate new transactions
+  // TODO: Replace with real blockchain event listening
+  // For now, no fake data generation
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newTransaction: WhaleTransaction = {
-        id: Date.now().toString(),
-        type: ['deposit', 'withdraw', 'claim', 'transfer'][Math.floor(Math.random() * 4)] as any,
-        asset: ['stCORE', 'lstBTC', 'dualCORE'][Math.floor(Math.random() * 3)],
-        amount: Math.floor(Math.random() * 100000) + 1000,
-        value: Math.floor(Math.random() * 100000) + 1000,
-        from: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-        to: Math.random() > 0.5 ? 'CoreYield Protocol' : 'User Wallet',
-        timestamp: new Date(),
-        isWhale: Math.random() > 0.7,
-        impact: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as any,
-        txHash: `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 10)}`
-      }
-      
-      setTransactions(prev => [newTransaction, ...prev.slice(0, 49)]) // Keep last 50
-    }, 30000) // New transaction every 30 seconds
-
-    return () => clearInterval(interval)
+    // Implement real blockchain event listening here
+    console.log('Whale alerts initialized - implement real blockchain event listening')
   }, [])
 
   const filteredTransactions = transactions.filter(tx => {

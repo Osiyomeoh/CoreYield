@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
-import { formatUnits } from 'viem'
-import { ASSET_METADATA } from '@contracts/addresses'
-import { useYieldProtocol } from '../hooks/useYieldProtocol'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useCoreYield } from '../hooks/useCoreYield'
 
 interface YieldData {
   timestamp: number
@@ -20,102 +19,73 @@ interface ProtocolStats {
   uniqueUsers: number
 }
 
+interface PerformanceMetrics {
+  currentAPY: number
+  apyChangePercent: number
+  avgAPY: number
+  volatility: number
+  minAPY: number
+  maxAPY: number
+}
+
+interface UserPortfolio {
+  syBalance: string
+  ptBalance: string
+  ytBalance: string
+  totalValue: number
+  estimatedAPY: number
+}
+
 export const Analytics: React.FC = () => {
   const { address, isConnected } = useAccount()
   const [selectedAsset, setSelectedAsset] = useState<'stCORE' | 'lstBTC' | 'dualCORE'>('stCORE')
-  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d' | '1y'>('7d')
+  const [timeRange, setTimeRange] = useState<'1D' | '7D' | '30D' | '1Y'>('7D')
   const [yieldData, setYieldData] = useState<YieldData[]>([])
+  
+  // Use the new CoreYield hook for real data
+  const coreYield = useCoreYield()
 
+  // TODO: Replace with real data from contracts
+  const protocolStats: ProtocolStats = {
+    totalMarkets: 0,
+    activeMarkets: 0,
+    totalValueLocked: 0,
+    totalYieldDistributed: 0,
+    averageAPY: 0,
+    uniqueUsers: 0
+  }
 
-  const stCOREHook = useYieldProtocol('stCORE')
-  const lstBTCHook = useYieldProtocol('lstBTC')
-  const dualCOREHook = useYieldProtocol('dualCORE')
+  // TODO: Replace with real data from contracts
+  const performanceMetrics: PerformanceMetrics = {
+    currentAPY: 0,
+    apyChangePercent: 0,
+    avgAPY: 0,
+    volatility: 0,
+    minAPY: 0,
+    maxAPY: 0
+  }
 
-  const currentHook = selectedAsset === 'stCORE' ? stCOREHook : selectedAsset === 'lstBTC' ? lstBTCHook : dualCOREHook
+  // TODO: Replace with real data from contracts
+  const userPortfolio: UserPortfolio = {
+    syBalance: '0.00',
+    ptBalance: '0.00',
+    ytBalance: '0.00',
+    totalValue: 0,
+    estimatedAPY: 0
+  }
 
-  const protocolStats: ProtocolStats = useMemo(() => ({
-    totalMarkets: 3,
-    activeMarkets: 3,
-    totalValueLocked: 1250000,
-    totalYieldDistributed: 45000,
-    averageAPY: 12.5,
-    uniqueUsers: 127
-  }), [])
+  // Asset metadata for display
+  const assetMetadata = {
+    stCORE: { name: 'Staked CORE', symbol: 'stCORE' },
+    lstBTC: { name: 'Liquid Staked BTC', symbol: 'lstBTC' },
+    dualCORE: { name: 'Dual CORE', symbol: 'dualCORE' }
+  }
 
   useEffect(() => {
-    const generateYieldData = () => {
-      const now = Date.now()
-      const data: YieldData[] = []
-      
-      for (let i = 0; i < 30; i++) {
-        const timestamp = now - (29 - i) * 24 * 60 * 60 * 1000
-        const baseAPY = 12.5
-        const volatility = (Math.random() - 0.5) * 4
-        const apy = Math.max(0, baseAPY + volatility)
-        
-        data.push({
-          timestamp,
-          apy: parseFloat(apy.toFixed(2)),
-          tvl: 1000000 + Math.random() * 500000,
-          volume: 50000 + Math.random() * 100000
-        })
-      }
-      
-      setYieldData(data)
-    }
-
-    generateYieldData()
+    // TODO: Replace with real data from contracts
+    // For now, set empty data until real contract integration is complete
+    setYieldData([])
   }, [timeRange])
-
-  const performanceMetrics = useMemo(() => {
-    if (yieldData.length === 0) return null
-
-    const currentAPY = yieldData[yieldData.length - 1]?.apy || 0
-    const previousAPY = yieldData[0]?.apy || 0
-    const apyChange = currentAPY - previousAPY
-    const apyChangePercent = previousAPY > 0 ? (apyChange / previousAPY) * 100 : 0
-
-    const avgAPY = yieldData.reduce((sum, data) => sum + data.apy, 0) / yieldData.length
-    const maxAPY = Math.max(...yieldData.map(d => d.apy))
-    const minAPY = Math.min(...yieldData.map(d => d.apy))
-
-    return {
-      currentAPY,
-      apyChange,
-      apyChangePercent,
-      avgAPY: parseFloat(avgAPY.toFixed(2)),
-      maxAPY,
-      minAPY,
-      volatility: parseFloat(((maxAPY - minAPY) / avgAPY * 100).toFixed(2))
-    }
-  }, [yieldData])
-
-  /**
-   * Calculate user's portfolio performance metrics
-   * Combines SY, PT, and YT balances to provide comprehensive portfolio view
-   * Includes yield accumulation and estimated APY calculations
-   */
-  const userPortfolio = useMemo(() => {
-    if (!isConnected || !address) return null
-
-    const syBalance: bigint = (currentHook?.syBalance as bigint) ?? 0n
-    const ptBalance: bigint = (currentHook?.ptBalance as bigint) ?? 0n
-    const ytBalance: bigint = (currentHook?.ytBalance as bigint) ?? 0n
-    const accumulatedYield: bigint = (currentHook?.accumulatedYield as bigint) ?? 0n
-
-    const totalValue = (Number(formatUnits(syBalance, 18)) * 1) +
-                      (Number(formatUnits(ptBalance, 18)) * 0.95) +
-                      (Number(formatUnits(ytBalance, 18)) * 0.05)
-
-    return {
-      syBalance: formatUnits(syBalance, 18),
-      ptBalance: formatUnits(ptBalance, 18),
-      ytBalance: formatUnits(ytBalance, 18),
-      accumulatedYield: formatUnits(accumulatedYield, 18),
-      totalValue: parseFloat(totalValue.toFixed(2)),
-      estimatedAPY: performanceMetrics?.currentAPY || 0
-    }
-  }, [isConnected, address, currentHook, performanceMetrics])
 
   if (!isConnected) {
     return (
@@ -123,6 +93,9 @@ export const Analytics: React.FC = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Connect Wallet to View Analytics</h2>
           <p className="text-gray-400">Connect your wallet to access detailed yield analytics and performance metrics</p>
+          <div className="mt-4">
+            <ConnectButton />
+          </div>
         </div>
       </div>
     )
@@ -140,7 +113,7 @@ export const Analytics: React.FC = () => {
         {/* Asset Selector */}
         <div className="mb-8">
           <div className="flex space-x-2 p-1 bg-gray-800 rounded-xl">
-            {Object.entries(ASSET_METADATA).map(([key, asset]) => (
+            {Object.entries(assetMetadata).map(([key, asset]) => (
               <button
                 key={key}
                 onClick={() => setSelectedAsset(key as 'stCORE' | 'lstBTC' | 'dualCORE')}
@@ -214,7 +187,7 @@ export const Analytics: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-white">APY Performance</h3>
               <div className="flex space-x-2">
-                {(['24h', '7d', '30d', '1y'] as const).map((range) => (
+                {(['1D', '7D', '30D', '1Y'] as const).map((range) => (
                   <button
                     key={range}
                     onClick={() => setTimeRange(range)}
@@ -253,95 +226,91 @@ export const Analytics: React.FC = () => {
           <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
             <h3 className="text-xl font-semibold text-white mb-6">Performance Metrics</h3>
             
-            {performanceMetrics && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Current APY</span>
-                  <span className="text-2xl font-bold text-green-400">{performanceMetrics.currentAPY}%</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">APY Change</span>
-                  <span className={`text-lg font-semibold ${
-                    performanceMetrics.apyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {performanceMetrics.apyChangePercent >= 0 ? '+' : ''}{performanceMetrics.apyChangePercent.toFixed(2)}%
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Average APY</span>
-                  <span className="text-lg font-semibold text-blue-400">{performanceMetrics.avgAPY}%</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Volatility</span>
-                  <span className="text-lg font-semibold text-orange-400">{performanceMetrics.volatility}%</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Range</span>
-                  <span className="text-sm text-gray-300">
-                    {performanceMetrics.minAPY}% - {performanceMetrics.maxAPY}%
-                  </span>
-                </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Current APY</span>
+                <span className="text-2xl font-bold text-green-400">{performanceMetrics.currentAPY}%</span>
               </div>
-            )}
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">APY Change</span>
+                <span className={`text-lg font-semibold ${
+                  performanceMetrics.apyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {performanceMetrics.apyChangePercent >= 0 ? '+' : ''}{performanceMetrics.apyChangePercent.toFixed(2)}%
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Average APY</span>
+                <span className="text-lg font-semibold text-blue-400">{performanceMetrics.avgAPY}%</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Volatility</span>
+                <span className="text-lg font-semibold text-orange-400">{performanceMetrics.volatility}%</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Range</span>
+                <span className="text-sm text-gray-300">
+                  {performanceMetrics.minAPY}% - {performanceMetrics.maxAPY}%
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* User Portfolio */}
-        {userPortfolio && (
-          <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 mb-8">
-            <h3 className="text-xl font-semibold text-white mb-6">Your Portfolio</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">💎</span>
-                </div>
-                <p className="text-gray-400 text-sm">SY Balance</p>
-                <p className="text-white text-xl font-bold">{userPortfolio.syBalance}</p>
+        <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 mb-8">
+          <h3 className="text-xl font-semibold text-white mb-6">Your Portfolio</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">💎</span>
               </div>
-              
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">🔒</span>
-                </div>
-                <p className="text-gray-400 text-sm">PT Balance</p>
-                <p className="text-white text-xl font-bold">{userPortfolio.ptBalance}</p>
-              </div>
-              
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">🎯</span>
-                </div>
-                <p className="text-gray-400 text-sm">YT Balance</p>
-                <p className="text-white text-xl font-bold">{userPortfolio.ytBalance}</p>
-              </div>
-              
-              <div className="text-center">
-                <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">💰</span>
-                </div>
-                <p className="text-gray-400 text-sm">Total Value</p>
-                <p className="text-white text-xl font-bold">${userPortfolio.totalValue}</p>
-              </div>
+              <p className="text-gray-400 text-sm">SY Balance</p>
+              <p className="text-white text-xl font-bold">{userPortfolio.syBalance}</p>
             </div>
             
-            <div className="mt-6 p-4 bg-gray-700/50 rounded-xl">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-300">Estimated Annual Yield</span>
-                <span className="text-2xl font-bold text-green-400">
-                  ${(userPortfolio.totalValue * userPortfolio.estimatedAPY / 100).toFixed(2)}
-                </span>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">🔒</span>
               </div>
-              <div className="text-sm text-gray-400 mt-1">
-                Based on current APY of {userPortfolio.estimatedAPY}%
+              <p className="text-gray-400 text-sm">PT Balance</p>
+              <p className="text-white text-xl font-bold">{userPortfolio.ptBalance}</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">🎯</span>
               </div>
+              <p className="text-gray-400 text-sm">YT Balance</p>
+              <p className="text-white text-xl font-bold">{userPortfolio.ytBalance}</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">💰</span>
+              </div>
+              <p className="text-gray-400 text-sm">Total Value</p>
+              <p className="text-white text-xl font-bold">${userPortfolio.totalValue}</p>
             </div>
           </div>
-        )}
+          
+          <div className="mt-6 p-4 bg-gray-700/50 rounded-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-300">Estimated Annual Yield</span>
+              <span className="text-2xl font-bold text-green-400">
+                ${(userPortfolio.totalValue * userPortfolio.estimatedAPY / 100).toFixed(2)}
+              </span>
+            </div>
+            <div className="text-sm text-gray-400 mt-1">
+              Based on current APY of {userPortfolio.estimatedAPY}%
+            </div>
+          </div>
+        </div>
 
         {/* Market Comparison */}
         <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
@@ -359,7 +328,7 @@ export const Analytics: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(ASSET_METADATA).map(([key, asset]) => (
+                {Object.entries(assetMetadata).map(([key, asset]) => (
                   <tr key={key} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-3">

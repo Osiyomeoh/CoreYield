@@ -322,36 +322,36 @@ export const Calculator: React.FC<CalculatorProps> = ({ onClose }) => {
           <div className="mt-6 grid md:grid-cols-3 gap-4">
             <button
               onClick={() => {
-                setPrincipal('10000')
-                setApy('12')
+                setPrincipal('1000')
+                setApy('8')
                 setTimeframe('365')
               }}
               className="p-4 bg-gray-800 hover:bg-gray-750 rounded-lg border border-gray-700 text-left transition-colors"
             >
               <div className="text-blue-400 font-medium text-sm">Example 1</div>
-              <div className="text-gray-300 text-xs mt-1">$10,000 at 12% APY</div>
+              <div className="text-gray-300 text-xs mt-1">$1,000 at 8% APY</div>
             </button>
             <button
               onClick={() => {
-                setPrincipal('5000')
-                setApy('8')
+                setPrincipal('500')
+                setApy('6')
                 setTimeframe('180')
               }}
               className="p-4 bg-gray-800 hover:bg-gray-750 rounded-lg border border-gray-700 text-left transition-colors"
             >
               <div className="text-purple-400 font-medium text-sm">Example 2</div>
-              <div className="text-gray-300 text-xs mt-1">$5,000 at 8% APY (6 months)</div>
+              <div className="text-gray-300 text-xs mt-1">$500 at 6% APY (6 months)</div>
             </button>
             <button
               onClick={() => {
-                setPrincipal('25000')
-                setApy('15')
+                setPrincipal('2000')
+                setApy('10')
                 setTimeframe('730')
               }}
               className="p-4 bg-gray-800 hover:bg-gray-750 rounded-lg border border-gray-700 text-left transition-colors"
             >
               <div className="text-green-400 font-medium text-sm">Example 3</div>
-              <div className="text-gray-300 text-xs mt-1">$25,000 at 15% APY (2 years)</div>
+              <div className="text-gray-300 text-xs mt-1">$2,000 at 10% APY (2 years)</div>
             </button>
           </div>
         </div>

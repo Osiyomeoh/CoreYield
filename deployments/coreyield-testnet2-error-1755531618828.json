@@ -1,0 +1,23 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-18T15:37:25.308Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {
+    "MockDualCORE": "0xd87c3A4c4daD302a32A6A2fb7E8821f31841D7C6",
+    "MockStCORE": "0x9d3f2756C26bd41CD4A1f0f1A362B89EcB5c3B8b",
+    "CoreStaking": "0xB3C92dD0bb450cd6eD1dc8C925094Ec6B2e80d0e",
+    "CoreSwapAMM": "0xDf1b81945f13A6eb3916934A773C016A1AA85360",
+    "PortfolioTracker": "0x878a292DB746837de6f8a92aC90fF94201957E7f",
+    "YieldHarvester": "0x1d80838960FD6000fFa88eef78d39Ce21F389c22",
+    "RiskManager": "0x26d3ADCC26C1DAcE46916463F3b88f418972f89A",
+    "CoreGovernance": "0x1aC0CAb0be403A8200Af180b5a919bB1Bfbe33C3",
+    "AnalyticsEngine": "0x06c7a75a92AC9dB56da3bE2B5D9682aF6BDD0B3D",
+    "CoreYieldStrategy": "0x8b6D7f5991507Ea35Bdc0BC440A3055eeecD4c45",
+    "CoreYieldBridge": "0x8326676CB88dd2678fd9A516DA1fBF14E33C9A98",
+    "CoreYieldRouter": "0x6174936Ee9A2711BC41cc27714bb258b87b78e30"
+  },
+  "verification": {},
+  "testResults": {},
+  "error": "execution reverted: Both tokens must be supported",
+  "stack": "ProviderError: execution reverted: Both tokens must be supported\n    at HttpProvider.request (/Users/MAC/Downloads/CoreYield/node_modules/hardhat/src/internal/core/providers/http.ts:116:21)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async HardhatEthersProvider.estimateGas (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/internal/hardhat-ethers-provider.ts:246:27)\n    at async /Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:335:35\n    at async Promise.all (index 0)\n    at async HardhatEthersSigner._sendUncheckedTransaction (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:356:7)\n    at async HardhatEthersSigner.sendTransaction (/Users/MAC/Downloads/CoreYield/node_modules/@nomicfoundation/hardhat-ethers/src/signers.ts:181:18)\n    at async send (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/contract.ts:313:20)\n    at async Proxy.createPool (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/contract.ts:352:16)\n    at async main (/Users/MAC/Downloads/CoreYield/scripts/deploy-testnet.ts:224:5)"
+}

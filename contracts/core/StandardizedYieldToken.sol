@@ -1,292 +1,265 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "./PrincipalToken.sol";
+import "./YieldToken.sol";
 
-contract StandardizedYieldToken is ERC20, ReentrancyGuard, Pausable, Ownable {
-    IERC20 public immutable underlyingAsset;
-    uint256 public yieldRate;
-    uint256 public totalYieldAccumulated;
-    uint256 public lastGlobalUpdate;
-    uint256 public maxSupply;
-    uint256 public minWrapAmount;
+contract StandardizedYieldToken is ERC20, Ownable {
+    using SafeERC20 for IERC20;
+    using Math for uint256;
+
+    // Token structure
+    address public immutable underlying;
+    uint256 public immutable maturity;
+    uint256 public exchangeRate;
     
-    mapping(address => uint256) public userYieldDebt;
-    mapping(address => uint256) public userLastUpdate;
-    mapping(address => uint256) public userTotalYieldClaimed;
+    // Factory and associated tokens
+    address public factory;
+    address public ptToken;
+    address public ytToken;
     
-    mapping(address => bool) public flashMintApproved;
-    uint256 public flashMintFee = 5;
+    // Yield tracking
+    uint256 public totalYieldAccrued;
+    uint256 public lastUpdateTime;
+    uint256 public yieldRate; // APY in basis points
     
-    event YieldAccumulated(address indexed user, uint256 amount);
-    event AssetWrapped(address indexed user, uint256 amount);
-    event AssetUnwrapped(address indexed user, uint256 amount);
-    event YieldRateUpdated(uint256 oldRate, uint256 newRate);
-    event FlashMint(address indexed user, uint256 amount, uint256 fee);
-    event BatchWrapExecuted(uint256 totalAmount, uint256 userCount);
-    event MaxSupplyUpdated(uint256 oldMax, uint256 newMax);
-    event MinWrapAmountUpdated(uint256 oldMin, uint256 newMin);
+    // Fee structure
+    struct FeeConfig {
+        uint256 wrapFee;           // Fee on wrap operations
+        uint256 unwrapFee;         // Fee on unwrap operations
+        uint256 yieldFee;          // Fee on yield accrual
+        address feeCollector;      // Fee collector address
+    }
     
-    error InsufficientBalance(uint256 requested, uint256 available);
-    error InvalidAmount(uint256 amount);
-    error YieldRateTooHigh(uint256 rate);
-    error FlashMintNotApproved(address user);
-    error MaxSupplyExceeded(uint256 requested, uint256 maxAllowed);
+    FeeConfig public feeConfig;
+    uint256 public constant BASIS_POINTS = 10000;
     
+    // Events
+    event TokensSplit(
+        address indexed user,
+        uint256 syAmount,
+        uint256 ptAmount,
+        uint256 ytAmount
+    );
+    
+    event YieldAccrued(
+        uint256 amount,
+        uint256 newExchangeRate,
+        uint256 timestamp
+    );
+    
+    event FeesCollected(
+        address indexed user,
+        uint256 amount,
+        string operation
+    );
+
     constructor(
-        string memory name,
-        string memory symbol,
-        address _underlyingAsset,
-        uint256 _yieldRate
-    ) ERC20(name, symbol) Ownable(msg.sender) {
-        require(_underlyingAsset != address(0), "Invalid underlying asset");
-        require(_yieldRate > 0 && _yieldRate <= 10000, "Invalid yield rate");
+        address _underlying,
+        string memory _name,
+        string memory _symbol,
+        uint256 _maturity,
+        uint256 _initialExchangeRate
+    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+        underlying = _underlying;
+        maturity = _maturity;
+        exchangeRate = _initialExchangeRate;
+        lastUpdateTime = block.timestamp;
+        yieldRate = 500; // Default 5% APY
         
-        underlyingAsset = IERC20(_underlyingAsset);
-        yieldRate = _yieldRate;
-        lastGlobalUpdate = block.timestamp;
-        maxSupply = type(uint256).max;
-        minWrapAmount = 1e15;
+        feeConfig = FeeConfig({
+            wrapFee: 50,            // 0.5%
+            unwrapFee: 50,          // 0.5%
+            yieldFee: 100,          // 1%
+            feeCollector: msg.sender
+        });
     }
-    
-    
-    function wrap(uint256 amount) external nonReentrant whenNotPaused returns (uint256) {
-        if (amount == 0) revert InvalidAmount(amount);
-        if (amount < minWrapAmount) revert InvalidAmount(amount);
-        if (totalSupply() + amount > maxSupply) revert MaxSupplyExceeded(totalSupply() + amount, maxSupply);
-        
-        _updateUserYield(msg.sender);
-        
-        require(underlyingAsset.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-        _mint(msg.sender, amount);
-        
-        userLastUpdate[msg.sender] = block.timestamp;
-        
-        emit AssetWrapped(msg.sender, amount);
-        return amount;
+
+    // Set factory and associated tokens
+    function setFactoryAndTokens(
+        address _factory,
+        address _ptToken,
+        address _ytToken
+    ) external onlyOwner {
+        require(factory == address(0), "Already set");
+        factory = _factory;
+        ptToken = _ptToken;
+        ytToken = _ytToken;
     }
-    
-    function unwrap(uint256 amount) external nonReentrant whenNotPaused returns (uint256) {
-        if (amount == 0) revert InvalidAmount(amount);
-        uint256 userBalance = balanceOf(msg.sender);
-        if (userBalance < amount) revert InsufficientBalance(amount, userBalance);
+
+    // Wrap underlying asset to SY
+    function wrap(uint256 _amount) external returns (uint256 syAmount) {
+        require(block.timestamp < maturity, "Market matured");
+        require(_amount > 0, "Amount must be positive");
         
-        _updateUserYield(msg.sender);
+        // Calculate and collect wrap fee
+        uint256 feeAmount = (_amount * feeConfig.wrapFee) / BASIS_POINTS;
+        uint256 netAmount = _amount - feeAmount;
         
-        _burn(msg.sender, amount);
-        require(underlyingAsset.transfer(msg.sender, amount), "Transfer failed");
+        // Calculate SY amount based on current exchange rate (1:1 initially)
+        syAmount = netAmount; // Simple 1:1 ratio for now
         
-        emit AssetUnwrapped(msg.sender, amount);
-        return amount;
-    }
-    
-    function claimYield() external nonReentrant whenNotPaused returns (uint256) {
-        _updateUserYield(msg.sender);
+        // Transfer underlying tokens from user
+        IERC20(underlying).safeTransferFrom(msg.sender, address(this), _amount);
         
-        uint256 yieldAmount = userYieldDebt[msg.sender];
-        require(yieldAmount > 0, "No yield to claim");
+        // Mint SY tokens to user
+        _mint(msg.sender, syAmount);
         
-        userYieldDebt[msg.sender] = 0;
-        userTotalYieldClaimed[msg.sender] += yieldAmount;
-        
-        _mint(msg.sender, yieldAmount);
-        
-        emit YieldAccumulated(msg.sender, yieldAmount);
-        return yieldAmount;
-    }
-    
-    
-    function batchWrap(uint256[] memory amounts, address[] memory recipients) external nonReentrant whenNotPaused {
-        require(amounts.length == recipients.length, "Arrays length mismatch");
-        require(amounts.length <= 50, "Too many operations");
-        
-        uint256 totalAmount = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
-            totalAmount += amounts[i];
+        // Transfer fee to collector
+        if (feeAmount > 0) {
+            IERC20(underlying).safeTransfer(feeConfig.feeCollector, feeAmount);
+            emit FeesCollected(msg.sender, feeAmount, "wrap");
         }
         
-        require(underlyingAsset.transferFrom(msg.sender, address(this), totalAmount), "Transfer failed");
+        // Update exchange rate
+        _updateExchangeRate();
+    }
+
+    // Unwrap SY to underlying asset
+    function unwrap(uint256 _syAmount) external returns (uint256 underlyingAmount) {
+        require(block.timestamp < maturity, "Market matured");
+        require(_syAmount > 0, "Amount must be positive");
+        require(balanceOf(msg.sender) >= _syAmount, "Insufficient SY balance");
         
-        for (uint256 i = 0; i < amounts.length; i++) {
-            if (amounts[i] > 0) {
-                _updateUserYield(recipients[i]);
-                _mint(recipients[i], amounts[i]);
-                userLastUpdate[recipients[i]] = block.timestamp;
-                emit AssetWrapped(recipients[i], amounts[i]);
-            }
+        // Calculate underlying amount (1:1 ratio)
+        underlyingAmount = _syAmount;
+        
+        // Calculate and collect unwrap fee
+        uint256 feeAmount = (underlyingAmount * feeConfig.unwrapFee) / BASIS_POINTS;
+        uint256 netAmount = underlyingAmount - feeAmount;
+        
+        // Burn SY tokens
+        _burn(msg.sender, _syAmount);
+        
+        // Transfer underlying tokens to user
+        IERC20(underlying).safeTransfer(msg.sender, netAmount);
+        
+        // Transfer fee to collector
+        if (feeAmount > 0) {
+            IERC20(underlying).safeTransfer(feeConfig.feeCollector, feeAmount);
+            emit FeesCollected(msg.sender, feeAmount, "unwrap");
         }
         
-        emit BatchWrapExecuted(totalAmount, amounts.length);
+        // Update exchange rate
+        _updateExchangeRate();
     }
-    
-    function flashMint(uint256 amount, bytes calldata data) external nonReentrant whenNotPaused {
-        if (!flashMintApproved[msg.sender]) revert FlashMintNotApproved(msg.sender);
+
+    // Split SY to PT + YT (called by factory)
+    function split(
+        address _user,
+        uint256 _ptAmount,
+        uint256 _ytAmount
+    ) external {
+        require(msg.sender == factory, "Only factory can call");
+        require(_ptAmount == _ytAmount, "PT and YT amounts must be equal");
         
-        uint256 fee = (amount * flashMintFee) / 10000;
-        uint256 balanceBefore = balanceOf(msg.sender);
+        // Burn SY tokens
+        _burn(_user, _ptAmount);
         
-        _mint(msg.sender, amount);
+        // Mint PT and YT tokens
+        PrincipalToken(ptToken).mint(_user, _ptAmount);
+        YieldToken(ytToken).mint(_user, _ytAmount);
         
-        (bool success, ) = msg.sender.call(data);
-        require(success, "Flash mint callback failed");
+        emit TokensSplit(_user, _ptAmount, _ptAmount, _ytAmount);
+    }
+
+    // Accrue yield
+    function accrueYield() external {
+        require(block.timestamp < maturity, "Market matured");
         
-        uint256 balanceAfter = balanceOf(msg.sender);
-        require(balanceAfter >= balanceBefore + fee, "Flash mint not repaid");
+        uint256 timeElapsed = block.timestamp - lastUpdateTime;
+        if (timeElapsed == 0) return;
         
-        _burn(msg.sender, amount);
+        // Calculate yield based on current rate and time
+        uint256 yieldAmount = _calculateYieldAccrual(timeElapsed);
         
-        if (fee > 0) {
-            _transfer(msg.sender, owner(), fee);
+        if (yieldAmount > 0) {
+            // For now, keep exchange rate at 1:1
+            exchangeRate = 1e18;
+            
+            totalYieldAccrued += yieldAmount;
+            lastUpdateTime = block.timestamp;
+            
+            emit YieldAccrued(yieldAmount, exchangeRate, block.timestamp);
         }
-        
-        emit FlashMint(msg.sender, amount, fee);
     }
-    
-    
-    function getAccumulatedYield(address user) external view returns (uint256) {
-        if (balanceOf(user) == 0) return userYieldDebt[user];
+
+    // Calculate yield accrual
+    function _calculateYieldAccrual(uint256 _timeElapsed) internal view returns (uint256) {
+        uint256 totalUnderlying = IERC20(underlying).balanceOf(address(this));
+        uint256 annualYield = (totalUnderlying * yieldRate) / BASIS_POINTS;
+        uint256 timeInYear = 365 days;
         
-        uint256 timeElapsed = block.timestamp - userLastUpdate[user];
-        uint256 pendingYield = (balanceOf(user) * yieldRate * timeElapsed) / (365 days * 10000);
-        
-        return userYieldDebt[user] + pendingYield;
+        return (annualYield * _timeElapsed) / timeInYear;
     }
-    
+
+    // Update exchange rate
+    function _updateExchangeRate() internal {
+        // Keep exchange rate at 1:1 for simplicity
+        exchangeRate = 1e18;
+    }
+
+    // Set yield rate
+    function setYieldRate(uint256 _newRate) external onlyOwner {
+        require(_newRate <= 2000, "Rate too high"); // Max 20%
+        yieldRate = _newRate;
+    }
+
+    // Update fee configuration
+    function updateFeeConfig(
+        uint256 _wrapFee,
+        uint256 _unwrapFee,
+        uint256 _yieldFee,
+        address _feeCollector
+    ) external onlyOwner {
+        feeConfig.wrapFee = _wrapFee;
+        feeConfig.unwrapFee = _unwrapFee;
+        feeConfig.yieldFee = _yieldFee;
+        feeConfig.feeCollector = _feeCollector;
+    }
+
+    // View functions
+    function getYieldAccrued() external view returns (uint256) {
+        return totalYieldAccrued;
+    }
+
     function getCurrentAPY() external view returns (uint256) {
         return yieldRate;
     }
-    
-    function getYieldProjection(address user, uint256 timeHorizon) external view returns (uint256) {
-        uint256 userBalance = balanceOf(user);
-        if (userBalance == 0) return 0;
-        
-        return (userBalance * yieldRate * timeHorizon) / (365 days * 10000);
+
+    function getTimeToMaturity() external view returns (uint256) {
+        if (block.timestamp >= maturity) return 0;
+        return maturity - block.timestamp;
     }
-    
-    function getUserStats(address user) external view returns (
-        uint256 balance,
-        uint256 yieldDebt,
-        uint256 totalYieldClaimed,
-        uint256 lastUpdate,
-        uint256 pendingYield,
-        uint256 projectedAnnualYield
-    ) {
-        balance = balanceOf(user);
-        yieldDebt = userYieldDebt[user];
-        totalYieldClaimed = userTotalYieldClaimed[user];
-        lastUpdate = userLastUpdate[user];
-        
-        uint256 timeElapsed = block.timestamp - userLastUpdate[user];
-        pendingYield = balance > 0 ? (balance * yieldRate * timeElapsed) / (365 days * 10000) : 0;
-        projectedAnnualYield = (balance * yieldRate) / 10000;
+
+    function getUnderlyingBalance() external view returns (uint256) {
+        return IERC20(underlying).balanceOf(address(this));
     }
-    
-    function getProtocolStats() external view returns (
-        uint256 totalSupply_,
-        uint256 totalYieldAccumulated_,
-        uint256 currentYieldRate,
-        uint256 maxSupply_,
-        uint256 utilizationRate,
-        uint256 averageYieldPerToken
-    ) {
-        totalSupply_ = totalSupply();
-        totalYieldAccumulated_ = totalYieldAccumulated;
-        currentYieldRate = yieldRate;
-        maxSupply_ = maxSupply;
-        utilizationRate = maxSupply > 0 ? (totalSupply_ * 10000) / maxSupply : 0;
-        averageYieldPerToken = totalSupply_ > 0 ? totalYieldAccumulated_ / totalSupply_ : 0;
+
+    function getExchangeRate() external view returns (uint256) {
+        return exchangeRate;
     }
-    
-    
-    function _updateUserYield(address user) internal {
-        if (balanceOf(user) > 0) {
-            uint256 timeElapsed = block.timestamp - userLastUpdate[user];
-            if (timeElapsed > 0) {
-                uint256 newYield = (balanceOf(user) * yieldRate * timeElapsed) / (365 days * 10000);
-                userYieldDebt[user] += newYield;
-                totalYieldAccumulated += newYield;
-            }
-        }
-        userLastUpdate[user] = block.timestamp;
+
+    // Emergency functions
+    function emergencyMint(address _to, uint256 _amount) external onlyOwner {
+        _mint(_to, _amount);
     }
-    
-    function _update(address from, address to, uint256 value) internal override {
-        if (from != address(0)) _updateUserYield(from);
-        if (to != address(0)) _updateUserYield(to);
-        super._update(from, to, value);
+
+    // Mint function for factory
+    function mint(address _to, uint256 _amount) external onlyOwner {
+        _mint(_to, _amount);
     }
-    
-    
-    function setYieldRate(uint256 newRate) external onlyOwner {
-        if (newRate > 10000) revert YieldRateTooHigh(newRate);
-        uint256 oldRate = yieldRate;
-        yieldRate = newRate;
-        emit YieldRateUpdated(oldRate, newRate);
+
+    function emergencyBurn(uint256 _amount) external {
+        _burn(msg.sender, _amount);
     }
-    
-    function setMaxSupply(uint256 newMaxSupply) external onlyOwner {
-        uint256 oldMax = maxSupply;
-        maxSupply = newMaxSupply;
-        emit MaxSupplyUpdated(oldMax, newMaxSupply);
-    }
-    
-    function setMinWrapAmount(uint256 newMinAmount) external onlyOwner {
-        uint256 oldMin = minWrapAmount;
-        minWrapAmount = newMinAmount;
-        emit MinWrapAmountUpdated(oldMin, newMinAmount);
-    }
-    
-    function setFlashMintApproval(address user, bool approved) external onlyOwner {
-        flashMintApproved[user] = approved;
-    }
-    
-    function setFlashMintFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 100, "Fee too high");
-        flashMintFee = newFee;
-    }
-    
-    function pause() external onlyOwner {
-        _pause();
-    }
-    
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-    
-    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
-        require(token != address(underlyingAsset), "Cannot withdraw underlying");
-        IERC20(token).transfer(owner(), amount);
-    }
-    
-    
-    function simulateTimePass(uint256 timeInSeconds) external {
-        userLastUpdate[msg.sender] = block.timestamp - timeInSeconds;
-    }
-    
-    function forceYieldUpdate(address user) external {
-        _updateUserYield(user);
-    }
-    
-    function getDetailedYieldInfo(address user) external view returns (
-        uint256 balance,
-        uint256 yieldDebt,
-        uint256 lastUpdate,
-        uint256 timeElapsed,
-        uint256 pendingYield,
-        uint256 totalYield,
-        uint256 yieldRate_,
-        uint256 annualProjection
-    ) {
-        balance = balanceOf(user);
-        yieldDebt = userYieldDebt[user];
-        lastUpdate = userLastUpdate[user];
-        timeElapsed = block.timestamp - userLastUpdate[user];
-        pendingYield = balance > 0 ? (balance * yieldRate * timeElapsed) / (365 days * 10000) : 0;
-        totalYield = yieldDebt + pendingYield;
-        yieldRate_ = yieldRate;
-        annualProjection = (balance * yieldRate) / 10000;
+
+    function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
+        IERC20(_token).safeTransfer(owner(), _amount);
     }
 }

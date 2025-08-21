@@ -1,0 +1,23 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-18T15:33:17.556Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {
+    "MockDualCORE": "0x3472880e2BEe9E234b84de20f1B08CBBE01b99C2",
+    "MockStCORE": "0x9b76780a233b8c7dE4A5D246469ad850deDE9Fff",
+    "CoreStaking": "0x2c11192f3A6B6f31c5276E207392D48bE527bF8E",
+    "CoreSwapAMM": "0x2240eb069B96F945D91Bb259fFA19c36a7329A49",
+    "PortfolioTracker": "0x4f38a8BB8c344BE75d55E9149E988C7457F89F7a",
+    "YieldHarvester": "0x929aa82939B8379e2C936Ab0B1737798ec106bB8",
+    "RiskManager": "0xA96F721480C20A2d5925daF3cf07aE88BB16fe28",
+    "CoreGovernance": "0x67f40EF98dD223b0EA1Ec4DF4e1cE0342Fc3fF4D",
+    "AnalyticsEngine": "0xDd0c465A85640FA3378138c023DFd3330EDc74eC",
+    "CoreYieldStrategy": "0x738888c6D7b59308D13A5f58a2CE1E32fD4F6a39",
+    "CoreYieldBridge": "0xe972ECf718f19abec4801C2EB93b857b9B2247ED",
+    "CoreYieldRouter": "0x789b9576e0A3fC76761F5c121D288783F983Fc88"
+  },
+  "verification": {},
+  "testResults": {},
+  "error": "underflow (argument=\"value\", value=8.5, code=INVALID_ARGUMENT, version=6.15.0)",
+  "stack": "TypeError: underflow (argument=\"value\", value=8.5, code=INVALID_ARGUMENT, version=6.15.0)\n    at makeError (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/utils/errors.ts:691:21)\n    at assert (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/utils/errors.ts:719:25)\n    at assertArgument (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/utils/errors.ts:731:5)\n    at getBigInt (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/utils/maths.ts:99:27)\n    at NumberCoder.encode (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/abi/coders/number.ts:36:30)\n    at /Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/abi/coders/array.ts:64:19\n    at Array.forEach (<anonymous>)\n    at pack (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/abi/coders/array.ts:47:12)\n    at TupleCoder.encode (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/abi/coders/tuple.ts:62:20)\n    at AbiCoder.encode (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/abi/abi-coder.ts:195:15)"
+}

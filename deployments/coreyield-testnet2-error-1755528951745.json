@@ -1,0 +1,10 @@
+{
+  "network": "coreTestnet2",
+  "timestamp": "2025-08-18T14:55:51.735Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {},
+  "verification": {},
+  "testResults": {},
+  "error": "incorrect number of arguments to constructor",
+  "stack": "Error: incorrect number of arguments to constructor\n    at ContractFactory.getDeployTransaction (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/factory.ts:87:19)\n    at ContractFactory.deploy (/Users/MAC/Downloads/CoreYield/node_modules/ethers/src.ts/contract/factory.ts:105:31)\n    at main (/Users/MAC/Downloads/CoreYield/scripts/deploy-testnet.ts:54:41)"
+}

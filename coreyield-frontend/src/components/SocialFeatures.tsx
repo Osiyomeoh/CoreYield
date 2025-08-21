@@ -41,97 +41,14 @@ export const SocialFeatures: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<'stCORE' | 'lstBTC' | 'dualCORE'>('stCORE')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const [socialStrategies] = useState<SocialStrategy[]>([
-    {
-      id: '1',
-      name: 'Conservative Yield Stack',
-      description: 'A low-risk strategy focusing on stable yields with principal protection',
-      creator: '0x1234...5678',
-      creatorAvatar: '👨‍💼',
-      apy: 8.5,
-      tvl: 250000,
-      participants: 45,
-      riskLevel: 'low',
-      tags: ['conservative', 'stable', 'low-risk'],
-      isFollowing: false,
-      performance: { daily: 0.23, weekly: 1.6, monthly: 6.8 }
-    },
-    {
-      id: '2',
-      name: 'Aggressive Growth',
-      description: 'High-risk, high-reward strategy for experienced yield farmers',
-      creator: '0x8765...4321',
-      creatorAvatar: '🚀',
-      apy: 18.2,
-      tvl: 180000,
-      participants: 23,
-      riskLevel: 'high',
-      tags: ['aggressive', 'high-reward', 'experienced'],
-      isFollowing: true,
-      performance: { daily: 0.45, weekly: 3.2, monthly: 14.5 }
-    },
-    {
-      id: '3',
-      name: 'Balanced Portfolio',
-      description: 'Medium-risk strategy balancing yield and stability',
-      creator: '0x9999...8888',
-      creatorAvatar: '⚖️',
-      apy: 12.8,
-      tvl: 320000,
-      participants: 67,
-      riskLevel: 'medium',
-      tags: ['balanced', 'diversified', 'moderate'],
-      isFollowing: false,
-      performance: { daily: 0.34, weekly: 2.4, monthly: 10.2 }
-    }
-  ])
+  // TODO: Replace with real data from contracts
+  const [socialStrategies] = useState<SocialStrategy[]>([])
 
-  const [communityPosts] = useState<CommunityPost[]>([
-    {
-      id: '1',
-      author: '0x1234...5678',
-      authorAvatar: '👨‍💼',
-      content: 'Just hit 15% APY on my stCORE strategy! The CoreYield protocol is really delivering. Anyone else seeing similar results?',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      likes: 24,
-      comments: 8,
-      shares: 3,
-      isLiked: false,
-      tags: ['stCORE', 'success', '15%APY']
-    },
-    {
-      id: '2',
-      author: '0x8765...4321',
-      authorAvatar: '🚀',
-      content: 'New yield farming strategy: combining PT and YT tokens for maximum efficiency. Riskier but the rewards are worth it!',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      likes: 18,
-      comments: 12,
-      shares: 7,
-      isLiked: true,
-      tags: ['strategy', 'PT+YT', 'efficiency']
-    },
-    {
-      id: '3',
-      author: '0x9999...8888',
-      authorAvatar: '⚖️',
-      content: 'What do you think about the new dualCORE market? Seems like a good opportunity for diversification.',
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      likes: 15,
-      comments: 6,
-      shares: 2,
-      isLiked: false,
-      tags: ['dualCORE', 'diversification', 'discussion']
-    }
-  ])
+  // TODO: Replace with real data from contracts
+  const [communityPosts] = useState<CommunityPost[]>([])
 
-  const [leaderboard] = useState([
-    { rank: 1, address: '0x1234...5678', avatar: '👑', tvl: 125000, apy: 16.8, followers: 89 },
-    { rank: 2, address: '0x8765...4321', avatar: '🥈', tvl: 98000, apy: 15.2, followers: 67 },
-    { rank: 3, address: '0x9999...8888', avatar: '🥉', tvl: 87000, apy: 14.5, followers: 54 },
-    { rank: 4, address: '0x1111...2222', avatar: '💎', tvl: 76000, apy: 13.8, followers: 42 },
-    { rank: 5, address: '0x3333...4444', avatar: '🚀', tvl: 65000, apy: 12.9, followers: 38 }
-  ])
+  // TODO: Replace with real data from contracts
+  const [leaderboard] = useState([])
 
   const handleFollowStrategy = (strategyId: string) => {
     console.log(`Following strategy: ${strategyId}`)

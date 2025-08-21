@@ -26,18 +26,18 @@ const ProductionDashboard: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   
   const [markets, setMarkets] = useState([
-    { id: 'stCORE-30D', name: 'Staked CORE 30 Day', apy: 8.5, tvl: '1250000', users: 156, change24h: 0.8 },
-    { id: 'lstBTC-90D', name: 'Liquid Staked BTC 90 Day', apy: 12.2, tvl: '890000', users: 89, change24h: 1.2 },
-    { id: 'dualCORE-180D', name: 'Dual CORE 180 Day', apy: 15.8, tvl: '2100000', users: 234, change24h: 2.1 }
+    { id: 'stCORE-30D', name: 'Staked CORE 30 Day', apy: 0, tvl: '0', users: 0, change24h: 0 },
+    { id: 'lstBTC-90D', name: 'Liquid Staked BTC 90 Day', apy: 0, tvl: '0', users: 0, change24h: 0 },
+    { id: 'dualCORE-180D', name: 'Dual CORE 180 Day', apy: 0, tvl: '0', users: 0, change24h: 0 }
   ])
   
   const [protocolStats, setProtocolStats] = useState({
-    totalValueLocked: '4240000',
-    totalMarkets: 3,
-    activeUsers: 479,
-    averageAPY: 12.17,
-    change24h: 12.5,
-    change7d: 8.2
+    totalValueLocked: '0',
+    totalMarkets: 0,
+    activeUsers: 0,
+    averageAPY: 0,
+    change24h: 0,
+    change7d: 0
   })
 
   const updateData = useCallback(async () => {
@@ -47,18 +47,9 @@ const ProductionDashboard: React.FC = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      setMarkets(prev => prev.map(market => ({
-        ...market,
-        apy: market.apy + (Math.random() - 0.5) * 0.2,
-        tvl: (parseInt(market.tvl) + (Math.random() - 0.5) * 50000).toString(),
-        users: market.users + Math.floor((Math.random() - 0.5) * 5)
-      })))
-      
-      setProtocolStats(prev => ({
-        ...prev,
-        totalValueLocked: (parseInt(prev.totalValueLocked) + (Math.random() - 0.5) * 100000).toString(),
-        averageAPY: prev.averageAPY + (Math.random() - 0.5) * 0.1
-      }))
+      // TODO: Replace with real data from contracts
+      // For now, keep static values until real data is implemented
+      console.log('Data refresh requested - implement real contract data fetching here')
       
       setLastUpdated(new Date())
     } catch (err) {

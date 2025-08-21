@@ -1,0 +1,29 @@
+{
+  "tokens": {
+    "dualCORE": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0",
+    "stCORE": "0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650"
+  },
+  "CoreYieldMarketFactory": "0xcbEAF3BDe82155F56486Fb5a1072cb8baAf547cc",
+  "CoreYieldTokenOperations": "0x1429859428C0aBc9C2C47C8Ee9FBaf82cFA0F20f",
+  "CoreYieldAMM": "0x922D6956C99E12DFeB3224DEA977D0939758A1Fe",
+  "markets": {
+    "dualCORE": {
+      "syToken": "0x9230C445Ba467b69C09918E35c233B065F289A39",
+      "ptToken": "0x304f769D386c0c787674588D52448EEe6d550b9f",
+      "ytToken": "0x13328E4E2F2819cd49a611930364F1513b658eE7"
+    },
+    "stCORE": {
+      "syToken": "0x1D6fD8668896dC2FA849F5ef7A510A8C9d8b563C",
+      "ptToken": "0x2A61F5c42a0f218932254ec44Da4057dfC15146d",
+      "ytToken": "0xce8E04cadCBF3034b99643415A70751F181B586c"
+    }
+  },
+  "pools": {
+    "dualCORE": {
+      "poolKey": "0x05f2042252587707509b4cbe502b39358ae68f16d71064b25506ebfffdfd1374"
+    },
+    "stCORE": {
+      "poolKey": "0xa692da47c5daa93335b7e9acbf5dd2b08a0975b3ae7f889d4daa8a6669eae216"
+    }
+  }
+}

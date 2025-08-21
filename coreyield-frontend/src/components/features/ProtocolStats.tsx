@@ -17,22 +17,22 @@ const ProtocolStats: React.FC = () => {
       
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gray-800/50 rounded-lg p-3">
-          <div className="text-2xl font-bold text-blue-400">3</div>
+          <div className="text-2xl font-bold text-blue-400">0</div>
           <div className="text-xs text-gray-400">Active Markets</div>
         </div>
         
         <div className="bg-gray-800/50 rounded-lg p-3">
-          <div className="text-2xl font-bold text-green-400">$126M</div>
+          <div className="text-2xl font-bold text-green-400">$0.00</div>
           <div className="text-xs text-gray-400">Total TVL</div>
         </div>
         
         <div className="bg-gray-800/50 rounded-lg p-3">
-          <div className="text-2xl font-bold text-purple-400">8.3%</div>
+          <div className="text-2xl font-bold text-purple-400">0.00%</div>
           <div className="text-xs text-gray-400">Avg APY</div>
         </div>
         
         <div className="bg-gray-800/50 rounded-lg p-3">
-          <div className="text-2xl font-bold text-orange-400">2.8K</div>
+          <div className="text-2xl font-bold text-orange-400">0</div>
           <div className="text-xs text-gray-400">Users</div>
         </div>
       </div>
@@ -40,11 +40,11 @@ const ProtocolStats: React.FC = () => {
       <div className="mt-4 pt-4 border-t border-gray-700">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-400">24h Volume:</span>
-          <span className="text-white font-medium">$8.9M</span>
+          <span className="text-white font-medium">$0.00</span>
         </div>
         <div className="flex items-center justify-between text-sm mt-1">
           <span className="text-gray-400">Protocol Fee:</span>
-          <span className="text-white font-medium">0.1%</span>
+          <span className="text-white font-medium">0.00%</span>
         </div>
       </div>
     </motion.div>

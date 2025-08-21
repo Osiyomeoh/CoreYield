@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { useCoreYield } from '../hooks/useCoreYield'
+import { useReadContract } from 'wagmi'
+import { CONTRACTS } from '../../contracts/addresses'
+import CoreYieldRouterABI from '../abis/CoreYieldRouter.json'
+import CoreStakingABI from '../abis/CoreStaking.json'
+import AnalyticsEngineABI from '../abis/AnalyticsEngine.json'
+import { formatUnits } from 'viem'
 
 
 interface LandingPageProps {
@@ -10,6 +18,52 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchApp, onShowEdu
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [scrollY, setScrollY] = useState(0)
   const heroRef = useRef<HTMLDivElement>(null)
+
+  // Get real protocol stats from contracts
+  const { data: protocolStats } = useReadContract({
+    address: CONTRACTS.CORE_YIELD_ROUTER as `0x${string}`,
+    abi: CoreYieldRouterABI.abi as any,
+    functionName: 'getProtocolStats',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Get real staking stats
+  const { data: stakingStats } = useReadContract({
+    address: CONTRACTS.CORE_STAKING as `0x${string}`,
+    abi: CoreStakingABI.abi as any,
+    functionName: 'getStakingStats',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Get real analytics data
+  const { data: analyticsData } = useReadContract({
+    address: CONTRACTS.ANALYTICS_ENGINE as `0x${string}`,
+    abi: AnalyticsEngineABI.abi as any,
+    functionName: 'getGlobalAnalytics',
+    query: { refetchInterval: 30000 }
+  })
+
+  // Dynamic metrics based on real contract data
+  const protocolMetrics = [
+    { 
+      value: protocolStats?.[0] ? `$${formatUnits(protocolStats[0] as bigint, 18)}` : "$0", 
+      label: "Total Value Locked", 
+      gradient: "from-amber-500 to-orange-400", 
+      icon: "🔒" 
+    },
+    { 
+      value: analyticsData?.[0] ? `$${formatUnits(analyticsData[0] as bigint, 18)}` : "$0", 
+      label: "Trading Volume", 
+      gradient: "from-blue-500 to-cyan-400", 
+      icon: "📊" 
+    },
+    { 
+      value: stakingStats?.[3] ? `$${formatUnits(stakingStats[3] as bigint, 18)}` : "$0", 
+      label: "Yield Generated", 
+      gradient: "from-purple-500 to-pink-400", 
+      icon: "💰" 
+    }
+  ]
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -265,9 +319,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchApp, onShowEdu
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3 sm:space-x-4">
             <div className="relative group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 via-blue-500 to-purple-600 rounded-2xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
-                <img src="/logo2.svg" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-blue-500 to-purple-600 rounded-2xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity duration-300"></div>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 rounded-2xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 border border-gray-700">
+                <img src="/logo2.png" alt="CoreYield" className="w-6 h-6 sm:w-8 sm:h-8" />
+                <div className="absolute inset-0 bg-gray-800 rounded-2xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity duration-300"></div>
               </div>
             </div>
             <div>
@@ -359,11 +413,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchApp, onShowEdu
 
           {/* Stats Grid */}
           <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {[
-              { value: "$ 2.14 M", label: "Total Value Locked", gradient: "from-amber-500 to-orange-400", icon: "🔒" },
-              { value: "$ 8.92 M", label: "Trading Volume", gradient: "from-blue-500 to-cyan-400", icon: "📊" },
-              { value: "$ 1.85 M", label: "Yield Generated", gradient: "from-purple-500 to-pink-400", icon: "💰" }
-            ].map((stat, i) => (
+            {protocolMetrics.map((stat, i) => (
               <div
                 key={i}
                 className="group relative p-8 bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-3xl backdrop-blur-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-500 hover:-translate-y-2 shadow-lg hover:shadow-2xl"
