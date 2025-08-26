@@ -1,0 +1,9 @@
+{
+  "network": "coreTestnet2-MINIMAL-AMM",
+  "timestamp": "2025-08-22T21:14:02.085Z",
+  "deployer": "0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663",
+  "contracts": {
+    "CoreYieldAMM_Minimal": "0x88c3fEc90E052026EB71d971E90a476469184FD0"
+  },
+  "status": "Minimal AMM deployed and tested successfully"
+}

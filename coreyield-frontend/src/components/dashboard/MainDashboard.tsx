@@ -102,6 +102,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   const [mergeYtAmount, setMergeYtAmount] = useState('')
   const [unwrapAmount, setUnwrapAmount] = useState('')
   const [mintAmount, setMintAmount] = useState('')
+  const [redeemAmount, setRedeemAmount] = useState('')
+  const [swapAmount, setSwapAmount] = useState('')
+  const [swapDirection, setSwapDirection] = useState<'pt-to-yt' | 'yt-to-pt'>('pt-to-yt')
+  const [limitOrderType, setLimitOrderType] = useState<'buy' | 'sell'>('buy')
+  const [limitPrice, setLimitPrice] = useState('')
+  const [limitAmount, setLimitAmount] = useState('')
   const [stakeAmount, setStakeAmount] = useState('')
   const [unstakeAmount, setUnstakeAmount] = useState('')
   
@@ -118,7 +124,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
     market: null
   })
   
-  const [toolsTab, setToolsTab] = useState<'stake' | 'wrap' | 'split' | 'merge' | 'unwrap' | 'unstake' | 'claim' | 'mint'>('stake')
+  const [toolsTab, setToolsTab] = useState<'stake' | 'wrap' | 'split' | 'merge' | 'unwrap' | 'unstake' | 'claim' | 'redeem' | 'mint'>('stake')
   const [tradingTab, setTradingTab] = useState<'swap' | 'limit' | 'tools'>('tools')
   const [leftPanelTab, setLeftPanelTab] = useState<'Market Info' | 'Charts' | 'Book'>('Charts')
   
@@ -145,6 +151,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   
   // Selected Asset State
   const [selectedAsset, setSelectedAsset] = useState('stCORE')
+  const [selectedMarket, setSelectedMarket] = useState('stCORE_0') // Default to first stCORE market
   const coreYield = useCoreYield()
   const { transactions } = useTransactionHistory()
   const { notifications, removeNotification } = useNotifications()
@@ -242,17 +249,20 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   }, [])
 
   const coreYieldMarkets = useMemo(() => {
-    // Core markets for the protocol
-    const markets = [
-      {
-        name: 'stCORE',
+    // Use actual markets from CONTRACTS.MARKETS instead of hardcoded data
+    const markets = Object.entries(CONTRACTS.MARKETS).map(([marketKey, market]) => {
+      const isLstBTC = marketKey.startsWith('lstBTC')
+      const isStCORE = marketKey.startsWith('stCORE')
+      
+      return {
+        name: marketKey,
         protocol: 'CoreYield',
-        maturity: '30 Dec 2025',
+        maturity: new Date(market.maturity * 1000).toLocaleDateString(), // Keep as string for MarketAsset compatibility
         liquidity: '$0.00',
         totalTVL: '$0.00',
         ptAPY: 0,
         ytAPY: 0,
-        icon: '🔒',
+        icon: isLstBTC ? '₿' : isStCORE ? '🔥' : '⚡',
         featured: true,
         volume24h: '$0.00',
         marketMode: 'NEUTRAL',
@@ -261,53 +271,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
           buyYT: false,
           confidence: 0
         },
-        description: 'Staked CORE yield tokenization',
-        underlying: 'CORE',
-        points: ['Staking', 'Yield', 'Liquidity']
-      },
-      {
-        name: 'dualCORE',
-        protocol: 'CoreYield',
-        maturity: '30 Dec 2025',
-        liquidity: '$0.00',
-        totalTVL: '$0.00',
-        ptAPY: 0,
-        ytAPY: 0,
-        icon: '⚡',
-        featured: true,
-        volume24h: '$0.00',
-        marketMode: 'NEUTRAL',
-        tradingSignals: {
-          buyPT: false,
-          buyYT: false,
-          confidence: 0
-        },
-        description: 'Dual CORE strategy yield',
-        underlying: 'CORE',
-        points: ['Strategy', 'Enhanced Yield', 'Risk Management']
-      },
-      {
-        name: 'lstBTC',
-        protocol: 'CoreYield',
-        maturity: '30 Dec 2025',
-        liquidity: '$0.00',
-        totalTVL: '$0.00',
-        ptAPY: 0,
-        ytAPY: 0,
-        icon: '🌊',
-        featured: true,
-        volume24h: '$0.00',
-        marketMode: 'NEUTRAL',
-        tradingSignals: {
-          buyPT: false,
-          buyYT: false,
-          confidence: 0
-        },
-        description: 'Liquid staked Bitcoin yield',
-        underlying: 'BTC',
-        points: ['Bitcoin', 'Liquid Staking', 'Cross-chain']
+        description: `${isLstBTC ? 'lstBTC' : isStCORE ? 'stCORE' : 'dualCORE'} yield market`,
+        underlying: isLstBTC ? 'BTC' : 'CORE',
+        points: ['Yield', 'Liquidity', 'Trading'],
+        marketKey: marketKey,
+        poolReserves: market.poolReserves,
+        // Store raw market data for trading view
+        rawMarket: market
       }
-    ]
+    })
 
     return markets
   }, [])
@@ -362,13 +334,42 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   }
 
   const handleTradeClick = (tokenType: 'PT' | 'YT', asset: string, market: any) => {
+    console.log('🔍 handleTradeClick Debug - tokenType:', tokenType);
+    console.log('🔍 handleTradeClick Debug - asset:', asset);
+    console.log('🔍 handleTradeClick Debug - market:', market);
+    
+    // If market is a MarketAsset, we need to find the corresponding raw market data
+    let tradingMarket = market;
+    
+    if (market && market.rawMarket) {
+      // If it has rawMarket, use that
+      tradingMarket = market.rawMarket;
+    } else if (market && market.marketKey) {
+      // If it's a MarketAsset, find the raw market data from CONTRACTS.MARKETS
+      const marketKey = market.marketKey as keyof typeof CONTRACTS.MARKETS;
+      tradingMarket = CONTRACTS.MARKETS[marketKey];
+      console.log('🔍 handleTradeClick Debug - found raw market:', tradingMarket);
+    }
+    
+    if (!tradingMarket) {
+      console.error('❌ handleTradeClick Error - No market data found for:', market);
+      return;
+    }
+    
     setTradingView({
       isActive: true,
       tokenType,
       asset,
-      market
+      market: tradingMarket
     })
     setCurrentView('trading')
+    
+    console.log('🔍 handleTradeClick Debug - tradingView set:', {
+      isActive: true,
+      tokenType,
+      asset,
+      market: tradingMarket
+    });
   }
 
   // Render Pendle-style Header
@@ -1591,7 +1592,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
               </svg>
             </button>
                 <div>
-              <h1 className="text-xl font-bold text-white">{tokenType} {asset}</h1>
+              <h1 className="text-xl font-bold text-white">{tokenType} {market?.name || asset}</h1>
               <p className="text-gray-400 text-sm">Trade {tokenType} tokens on CoreDAO</p>
                 </div>
           </div>
@@ -1605,8 +1606,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
               </svg>
             </button>
             <div className="text-right">
-              <div className="text-white font-medium">30 Dec 2025</div>
-              <div className="text-gray-400 text-sm">120 days</div>
+              <div className="text-white font-medium">
+                {market?.maturity ? new Date(market.maturity * 1000).toLocaleDateString() : 'N/A'}
+              </div>
+              <div className="text-gray-400 text-sm">
+                {market?.maturity ? Math.ceil((market.maturity - Math.floor(Date.now() / 1000)) / (24 * 60 * 60)) : 'N/A'} days
+              </div>
             </div>
           </div>
         </div>
@@ -1647,7 +1652,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                   </div>
                 </div>
                 <p className="text-gray-300 text-sm mb-4">
-                  1 {tokenType} {asset} gives the yield and points of 1 {asset} staked in Core until maturity.
+                  1 {tokenType} {market?.name || asset} gives the yield and points of 1 {market?.underlying || asset} staked in Core until maturity.
                 </p>
                 
                 {/* Enhanced Market Stats */}
@@ -1664,13 +1669,19 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                   </div>
                   <div className="bg-gray-700/50 rounded-lg p-3">
                     <div className="text-gray-400 text-xs mb-1">Maturity</div>
-                    <div className="text-white font-bold text-lg">120 days</div>
-                    <div className="text-blue-400 text-xs">Dec 30, 2025</div>
+                    <div className="text-white font-bold text-lg">
+                      {market?.maturity ? Math.ceil((market.maturity - Math.floor(Date.now() / 1000)) / (24 * 60 * 60)) : 'N/A'} days
+                    </div>
+                    <div className="text-blue-400 text-xs">
+                      {market?.maturity ? new Date(market.maturity * 1000).toLocaleDateString() : 'N/A'}
+                    </div>
                   </div>
                   <div className="bg-gray-700/50 rounded-lg p-3">
-                    <div className="text-gray-400 text-xs mb-1">Market Cap</div>
-                    <div className="text-white font-bold text-lg">$0.00</div>
-                    <div className="text-green-400 text-xs">+8.9%</div>
+                    <div className="text-gray-400 text-xs mb-1">Pool Reserves</div>
+                    <div className="text-white font-bold text-lg">
+                      PT: {market?.poolReserves?.pt || '0'} | YT: {market?.poolReserves?.yt || '0'}
+                    </div>
+                    <div className="text-green-400 text-xs">Active Market</div>
                   </div>
                 </div>
 
@@ -1682,7 +1693,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </svg>
                     <span className="text-blue-300 font-medium">Trading Signal</span>
                   </div>
-                  <p className="text-blue-200 text-sm">Strong buy signal for {tokenType} {asset}. APY trending upward with increasing liquidity.</p>
+                  <p className="text-blue-200 text-sm">Strong buy signal for {tokenType} {market?.name || asset}. APY trending upward with increasing liquidity.</p>
                 </div>
 
                 {/* Risk Assessment */}
@@ -1836,7 +1847,22 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <span className="text-gray-300 text-sm font-medium">Core Balances</span>
-                  <div className="text-gray-500 text-xs">stCORE Market</div>
+                  <div className="text-gray-500 text-xs">
+                    {(() => {
+                      console.log('🔍 Core Balances Debug - currentView:', currentView);
+                      console.log('🔍 Core Balances Debug - tradingView:', tradingView);
+                      console.log('🔍 Core Balances Debug - asset:', tradingView.asset);
+                      console.log('🔍 Core Balances Debug - market:', tradingView.market);
+                      
+                      return currentView === 'trading' && tradingView.asset 
+                        ? `${tradingView.asset} Market` 
+                        : 'stCORE Market';
+                    })()}
+                  </div>
+                  {/* Debug info */}
+                  <div className="text-xs text-red-400 mt-1">
+                    Debug: currentView={currentView}, asset={tradingView.asset || 'none'}
+                  </div>
                 </div>
                 <button
                   onClick={() => window.location.reload()}
@@ -1851,36 +1877,78 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
                   <div className="text-gray-400 text-xs mb-1">CORE</div>
                   <div className="text-white text-sm font-semibold">
-                    {parseFloat(coreYield.userBalances?.dualCORE?.underlying || '0.00').toFixed(2)}
-                            </div>
-                            </div>
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      parseFloat(coreYield.userBalances?.dualCORE?.underlying || '0.00').toFixed(2)
+                    )}
+                  </div>
+                </div>
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
                   <div className="text-gray-400 text-xs mb-1">stCORE</div>
                   <div className="text-white text-sm font-semibold">
-                    {parseFloat(coreYield.userBalances?.stCORE?.underlying || '0.00').toFixed(2)}
-                            </div>
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      parseFloat(coreYield.userBalances?.stCORE?.underlying || '0.00').toFixed(2)
+                    )}
+                  </div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
                   <div className="text-gray-400 text-xs mb-1">lstBTC</div>
                   <div className="text-white text-sm font-semibold">
-                    {(() => {
-                      const value = coreYield.userBalances?.lstBTC?.underlying || '0.00';
-                      console.log('🔍 MainDashboard Debug - lstBTC value:', value);
-                      return parseFloat(value).toFixed(2);
-                    })()}
-                          </div>
-                        </div>
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
                       </div>
+                    ) : (
+                      (() => {
+                        const value = coreYield.userBalances?.lstBTC?.underlying || '0.00';
+                        console.log('🔍 MainDashboard Debug - lstBTC value:', value);
+                        return parseFloat(value).toFixed(2);
+                      })()
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Second Line - Tokenized Assets */}
               <div className="grid grid-cols-4 gap-2">
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
-                  <div className="text-gray-400 text-xs mb-1">SY (stCORE)</div>
+                  <div className="text-gray-400 text-xs mb-1">
+                    SY ({currentView === 'trading' && tradingView.asset 
+                      ? tradingView.asset.startsWith('lstBTC') ? 'lstBTC' : 'stCORE'
+                      : 'stCORE'
+                    })
+                  </div>
                   <div className="text-white text-sm font-semibold">
-                    {(() => {
-                      const stCoreSY = coreYield.userBalances?.stCORE?.sy || '0';
-                      return parseFloat(stCoreSY).toFixed(2);
-                    })()}
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      (() => {
+                        // Show data for the currently selected market
+                        if (currentView === 'trading' && tradingView.asset) {
+                          const marketName = tradingView.asset;
+                          if (marketName.startsWith('lstBTC')) {
+                            return parseFloat(coreYield.userBalances?.lstBTC?.sy || '0').toFixed(2);
+                          } else if (marketName.startsWith('stCORE')) {
+                            return parseFloat(coreYield.userBalances?.stCORE?.sy || '0').toFixed(2);
+                          }
+                        }
+                        // Default to stCORE
+                        return parseFloat(coreYield.userBalances?.stCORE?.sy || '0').toFixed(2);
+                      })()
+                    )}
                   </div>
                   <div className="mt-1">
                     <button
@@ -1892,30 +1960,95 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                   </div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
-                  <div className="text-gray-400 text-xs mb-1">PT (stCORE)</div>
+                  <div className="text-gray-400 text-xs mb-1">
+                    PT ({currentView === 'trading' && tradingView.asset 
+                      ? tradingView.asset.startsWith('lstBTC') ? 'lstBTC' : 'stCORE'
+                      : 'stCORE'
+                    })
+                  </div>
                   <div className="text-white text-sm font-semibold">
-                    {(() => {
-                      const stCorePT = coreYield.userBalances?.stCORE?.pt || '0';
-                      return parseFloat(stCorePT).toFixed(2);
-                    })()}
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      (() => {
+                        // Show data for the currently selected market
+                        if (currentView === 'trading' && tradingView.asset) {
+                          const marketName = tradingView.asset;
+                          if (marketName.startsWith('lstBTC')) {
+                            return parseFloat(coreYield.userBalances?.lstBTC?.pt || '0').toFixed(2);
+                          } else if (marketName.startsWith('stCORE')) {
+                            return parseFloat(coreYield.userBalances?.stCORE?.pt || '0').toFixed(2);
+                          }
+                        }
+                        // Default to stCORE
+                        return parseFloat(coreYield.userBalances?.stCORE?.pt || '0').toFixed(2);
+                      })()
+                    )}
                   </div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
-                  <div className="text-gray-400 text-xs mb-1">YT (stCORE)</div>
+                  <div className="text-gray-400 text-xs mb-1">
+                    YT ({currentView === 'trading' && tradingView.asset 
+                      ? tradingView.asset.startsWith('lstBTC') ? 'lstBTC' : 'stCORE'
+                      : 'stCORE'
+                    })
+                  </div>
                   <div className="text-white text-sm font-semibold">
-                    {(() => {
-                      const stCoreYT = coreYield.userBalances?.stCORE?.yt || '0';
-                      return parseFloat(stCoreYT).toFixed(2);
-                    })()}
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      (() => {
+                        // Show data for the currently selected market
+                        if (currentView === 'trading' && tradingView.asset) {
+                          const marketName = tradingView.asset;
+                          if (marketName.startsWith('lstBTC')) {
+                            return parseFloat(coreYield.userBalances?.lstBTC?.yt || '0').toFixed(2);
+                          } else if (marketName.startsWith('stCORE')) {
+                            return parseFloat(coreYield.userBalances?.stCORE?.yt || '0').toFixed(2);
+                          }
+                        }
+                        // Default to stCORE
+                        return parseFloat(coreYield.userBalances?.stCORE?.yt || '0').toFixed(2);
+                      })()
+                    )}
                   </div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-600/30">
                   <div className="text-gray-400 text-xs mb-1">Claim</div>
                   <div className="text-white text-sm font-semibold">
-                    {coreYield.userBalances?.dualCORE?.yt || '0.00'}
+                    {coreYield.isLoadingBalances ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-400"></div>
+                        <span className="text-xs text-gray-400">...</span>
+                      </div>
+                    ) : (
+                      (() => {
+                        // Show claimable yield for the currently selected market
+                        if (currentView === 'trading' && tradingView.asset) {
+                          const marketName = tradingView.asset;
+                          if (marketName.startsWith('lstBTC')) {
+                            // For lstBTC markets, show 0 claimable (no staking rewards)
+                            return '0.0000';
+                          } else if (marketName.startsWith('stCORE')) {
+                            // For stCORE markets, show staking rewards
+                            const claimable = coreYield.userBalances?.stCORE?.claimableYield || '0.00';
+                            return parseFloat(claimable).toFixed(4);
+                          }
+                        }
+                        // Default to stCORE claimable yield
+                        const claimable = coreYield.userBalances?.stCORE?.claimableYield || '0.00';
+                        return parseFloat(claimable).toFixed(4);
+                      })()
+                    )}
                   </div>
-                              </div>
-                            </div>
+                </div>
+              </div>
                           </div>
                           
             {/* Token Type Selection */}
@@ -2030,9 +2163,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     ))}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-1 mb-2">
+                  <div className="grid grid-cols-3 gap-1 mb-2">
                     {[
                       { id: 'claim', label: 'Claim', color: 'bg-green-600', icon: '💰' },
+                      { id: 'redeem', label: 'Redeem', color: 'bg-amber-600', icon: '🔓' },
                       { id: 'mint', label: 'Mint', color: 'bg-yellow-600', icon: '🪙' }
                     ].map((subTab) => (
                       <button
@@ -2106,7 +2240,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </div>
                   </div>
                               <button 
-                    onClick={() => coreYield.wrapToSY(selectedAsset, wrapAmount)}
+                    onClick={() => coreYield.wrapToSY(getMarketKey(selectedAsset), wrapAmount)}
                     disabled={!wrapAmount || parseFloat(wrapAmount) <= 0 || coreYield.transactionStatuses.wrap === 'pending'}
                     className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
@@ -2156,7 +2290,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </div>
                 </div>
                 <button 
-                    onClick={() => coreYield.splitSY(selectedAsset, splitAmount)}
+                    onClick={() => coreYield.splitSY(getMarketKey(selectedAsset), splitAmount)}
                     disabled={!splitAmount || parseFloat(splitAmount) <= 0 || coreYield.transactionStatuses.split === 'pending'}
                     className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                 >
@@ -2200,7 +2334,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </div>
                   </div>
                         <button 
-                    onClick={() => coreYield.mergePTYT(selectedAsset, mergePtAmount, mergeYtAmount)}
+                    onClick={() => coreYield.mergePTYT(getMarketKey(selectedAsset), mergePtAmount, mergeYtAmount)}
                     disabled={!mergePtAmount || !mergeYtAmount || parseFloat(mergePtAmount) <= 0 || parseFloat(mergeYtAmount) <= 0 || coreYield.transactionStatuses.merge === 'pending'}
                     className="w-full py-2 px-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
@@ -2230,7 +2364,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </div>
                   </div>
                   <button 
-                    onClick={() => coreYield.unwrapFromSY(selectedAsset, unwrapAmount)}
+                    onClick={() => coreYield.unwrapFromSY(getMarketKey(selectedAsset), unwrapAmount)}
                     disabled={!unwrapAmount || parseFloat(unwrapAmount) <= 0 || coreYield.transactionStatuses.unwrap === 'pending'}
                     className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
@@ -2240,29 +2374,51 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
         )}
 
               {toolsTab === 'unstake' && (
-                <div className="space-y-2">
-                  <div className="bg-gray-700/50 rounded-xl p-2 border border-gray-600/30">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-gray-300 text-xs font-medium">Unstake stCORE</label>
-                      <div className="text-gray-400 text-xs">
-                        Balance: {coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.sy || '0'}
-            </div>
-                    </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-gray-300 text-xs font-medium">Unstake stCORE</label>
                     <input
                       type="number"
-                      placeholder="0"
+                      placeholder="0.0"
+                      className="w-full mt-1 px-3 py-2 bg-gray-800/50 border border-gray-600/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       value={unstakeAmount}
                       onChange={(e) => setUnstakeAmount(e.target.value)}
-                      className="w-full bg-transparent text-white text-sm font-medium outline-none"
                     />
                     <div className="text-gray-400 text-xs mt-0.5">${parseFloat(unstakeAmount || '0') * 1.05}</div>
                   </div>
+                  
+                  {/* Lock Period Information */}
+                  {lockPeriodInfo && (
+                    <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-600/20">
+                      {lockPeriodInfo.isLocked ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                            <span className="text-yellow-400 text-sm font-medium">Unstake Locked</span>
+                          </div>
+                          <div className="text-gray-300 text-sm">
+                            Available in <span className="font-semibold text-yellow-400">{lockPeriodInfo.remainingDays} day(s)</span>
+                          </div>
+                          <div className="text-gray-400 text-xs">
+                            Unlocks on {lockPeriodInfo.unlockDate.toLocaleDateString()} at {lockPeriodInfo.unlockDate.toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-green-400 text-sm font-medium">Unstake Available</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <button 
-                    onClick={() => coreYield.unstake(selectedAsset, unwrapAmount)}
-                    disabled={!unwrapAmount || parseFloat(unwrapAmount) <= 0 || coreYield.transactionStatuses.unstake === 'pending'}
+                    onClick={() => coreYield.unstake(selectedAsset, unstakeAmount)}
+                    disabled={!unstakeAmount || parseFloat(unstakeAmount) <= 0 || coreYield.transactionStatuses.unstake === 'pending' || (lockPeriodInfo?.isLocked)}
                     className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
-                    {coreYield.transactionStatuses.unstake === 'pending' ? 'Processing...' : 'Unstake to CORE'}
+                    {coreYield.transactionStatuses.unstake === 'pending' ? 'Processing...' : 
+                     lockPeriodInfo?.isLocked ? 'Unstake Locked' : 'Unstake to CORE'}
                   </button>
                 </div>
               )}
@@ -2273,17 +2429,68 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-gray-300 text-xs font-medium">Claim Yield</label>
                       <div className="text-gray-400 text-xs">
-                        Available: {coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.yt || '0'}
+                        Available: {(() => {
+                        const claimable = coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.claimableYield || '0';
+                        return parseFloat(claimable).toFixed(4);
+                      })()}
+                      </div>
                     </div>
-                  </div>
-                    <div className="text-gray-400 text-xs">No yield available to claim</div>
+                    <div className="text-gray-400 text-xs">
+                      {parseFloat(coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.claimableYield || '0') > 0 
+                        ? `Ready to claim ${(() => {
+                            const claimable = coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.claimableYield || '0';
+                            return parseFloat(claimable).toFixed(4);
+                          })()} ${selectedAsset}`
+                        : 'No yield available to claim'
+                      }
+                    </div>
+
+
                   </div>
                   <button 
                     onClick={() => coreYield.claimYield(selectedAsset)}
-                    disabled={coreYield.transactionStatuses.claim === 'pending'}
+                    disabled={coreYield.transactionStatuses.claim === 'pending' || parseFloat(coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.claimableYield || '0') <= 0}
                     className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
                     {coreYield.transactionStatuses.claim === 'pending' ? 'Processing...' : 'Claim Yield'}
+                  </button>
+                </div>
+              )}
+
+              {toolsTab === 'redeem' && (
+                <div className="space-y-2">
+                  <div className="bg-gray-700/50 rounded-xl p-2 border border-gray-600/30">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-gray-300 text-xs font-medium">Redeem PT for Underlying</label>
+                      <div className="text-gray-400 text-xs">Asset: {selectedAsset}</div>
+                    </div>
+                    <div className="text-gray-400 text-xs mb-2">
+                      PT Balance: {coreYield.userBalances[selectedAsset]?.pt || '0'}
+                    </div>
+                    <div className="text-gray-400 text-xs mb-2">
+                      {(() => {
+                        // Check if market is matured (this would need to come from contract)
+                        const isMatured = false; // TODO: Get from contract
+                        return isMatured ? '✅ Market matured - Ready to redeem' : '⏳ Market not matured yet';
+                      })()}
+                    </div>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={redeemAmount}
+                      onChange={(e) => setRedeemAmount(e.target.value)}
+                      className="w-full bg-transparent text-white text-sm font-medium outline-none"
+                    />
+                    <div className="text-gray-400 text-xs mt-0.5">
+                      Redeem {redeemAmount || '0'} PT for underlying {selectedAsset}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => coreYield.redeemPT(selectedAsset, redeemAmount)}
+                    disabled={!redeemAmount || parseFloat(redeemAmount) <= 0 || coreYield.transactionStatuses.redeem === 'pending'}
+                    className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
+                  >
+                    {coreYield.transactionStatuses.redeem === 'pending' ? 'Processing...' : 'Redeem PT'}
                   </button>
                 </div>
               )}
@@ -2304,8 +2511,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     />
                     <div className="text-gray-400 text-xs mt-0.5">
                       Mint {mintAmount || '0'} {selectedAsset} tokens for testing
-                </div>
-              </div>
+                    </div>
+                  </div>
                   <button 
                     onClick={() => coreYield.mintTokens(selectedAsset as 'dualCORE' | 'stCORE' | 'lstBTC', mintAmount)}
                     disabled={!mintAmount || parseFloat(mintAmount) <= 0 || coreYield.transactionStatuses.mint === 'pending'}
@@ -2325,60 +2532,131 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     <p className="text-blue-300 text-sm text-center">
                       Swap PT and YT tokens directly
                     </p>
+                  </div>
+                  
+                  {/* Swap Direction Selection */}
+                  <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
+                    <div className="flex space-x-2 mb-3">
+                      <button 
+                        onClick={() => setSwapDirection('pt-to-yt')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          swapDirection === 'pt-to-yt' 
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' 
+                            : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        }`}
+                      >
+                        🔒 PT → 📈 YT
+                      </button>
+                      <button 
+                        onClick={() => setSwapDirection('yt-to-pt')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          swapDirection === 'yt-to-pt' 
+                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/25' 
+                            : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        }`}
+                      >
+                        📈 YT → 🔒 PT
+                      </button>
                     </div>
-                                    <div className="bg-gray-700/50 rounded-xl p-2 border border-gray-600/30">
+                  </div>
+
+                  {/* From Token */}
+                  <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-gray-300 text-xs font-medium">From</label>
                       <div className="text-gray-400 text-xs">
-                        Balance: {coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.pt || '0'}
-                    </div>
+                        Balance: {(() => {
+                          if (swapDirection === 'pt-to-yt') {
+                            return coreYield.userBalances[selectedAsset]?.pt || '0'
+                          } else {
+                            return coreYield.userBalances[selectedAsset]?.yt || '0'
+                          }
+                        })()}
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2 mb-2">
-                      <div className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white">
-                        🔒
-                  </div>
-                      <span className="text-white font-medium text-sm">PT {asset}</span>
-                      <button className="px-2 py-1 bg-gray-600 text-white text-xs rounded-lg hover:bg-gray-500 transition-all duration-200">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs text-white ${
+                        swapDirection === 'pt-to-yt' ? 'bg-blue-500' : 'bg-green-500'
+                      }`}>
+                        {swapDirection === 'pt-to-yt' ? '🔒' : '📈'}
+                      </div>
+                      <span className="text-white font-medium text-sm">
+                        {swapDirection === 'pt-to-yt' ? 'PT' : 'YT'} {selectedAsset}
+                      </span>
+                      <button 
+                        onClick={() => {
+                          const balance = swapDirection === 'pt-to-yt' 
+                            ? coreYield.userBalances[selectedAsset]?.pt || '0'
+                            : coreYield.userBalances[selectedAsset]?.yt || '0'
+                          setSwapAmount(balance)
+                        }}
+                        className="px-2 py-1 bg-gray-600 text-white text-xs rounded-lg hover:bg-gray-500 transition-all duration-200"
+                      >
                         Max
                       </button>
-                </div>
+                    </div>
                     <input
                       type="number"
                       placeholder="0"
+                      value={swapAmount}
+                      onChange={(e) => {
+                        console.log('🔍 Debug: Input changed, new value:', e.target.value)
+                        setSwapAmount(e.target.value)
+                      }}
                       className="w-full bg-transparent text-white text-lg font-medium outline-none"
                     />
-              </div>
+                  </div>
+
+                  {/* Swap Arrow */}
                   <div className="flex justify-center">
                     <div className="w-10 h-10 bg-gray-700/70 rounded-full flex items-center justify-center border border-gray-600/30 hover:bg-gray-600/70 transition-all duration-200">
                       <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                       </svg>
-            </div>
+                    </div>
                   </div>
+
+                  {/* To Token */}
                   <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-gray-300 text-xs font-medium">To</label>
                       <div className="text-gray-400 text-xs">
-                        Balance: {coreYield.userBalances[selectedAsset as keyof typeof coreYield.userBalances]?.yt || '0'}
+                        Balance: {(() => {
+                          if (swapDirection === 'pt-to-yt') {
+                            return coreYield.userBalances[selectedAsset]?.yt || '0'
+                          } else {
+                            return coreYield.userBalances[selectedAsset]?.pt || '0'
+                          }
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 mb-2">
-                      <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center text-xs text-white">
-                        📈
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs text-white ${
+                        swapDirection === 'pt-to-yt' ? 'bg-green-500' : 'bg-blue-500'
+                      }`}>
+                        {swapDirection === 'pt-to-yt' ? '📈' : '🔒'}
                       </div>
-                      <span className="text-white font-medium text-sm">YT {asset}</span>
+                      <span className="text-white font-medium text-sm">
+                        {swapDirection === 'pt-to-yt' ? 'YT' : 'PT'} {selectedAsset}
+                      </span>
                     </div>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      className="w-full bg-transparent text-white text-lg font-medium outline-none"
-                    />
+                    <div className="text-white text-lg font-medium">
+                      {swapAmount ? parseFloat(swapAmount).toFixed(4) : '0.0000'}
+                    </div>
                   </div>
-                  <button className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-all duration-200 text-sm shadow-lg shadow-green-600/25 hover:shadow-green-600/40">
-                    Swap Tokens
+
+                  {/* Swap Button */}
+                  <button 
+                    onClick={() => coreYield.swapPTYT(selectedAsset, swapAmount, swapDirection)}
+                    disabled={!swapAmount || parseFloat(swapAmount) <= 0 || coreYield.transactionStatuses.swap === 'pending'}
+                    className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm shadow-lg shadow-green-600/25 hover:shadow-green-600/40"
+                  >
+                    {coreYield.transactionStatuses.swap === 'pending' ? 'Processing...' : 'Swap Tokens'}
                   </button>
-          </div>
-        )}
+                  
+
+                </div>
+              )}
 
               {/* Limit Tab Content */}
               {tradingTab === 'limit' && (
@@ -2403,26 +2681,81 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
             </div>
                   <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-gray-300 text-xs font-medium">Price</label>
+                      <label className="text-gray-300 text-xs font-medium">Limit Price</label>
+                      <div className="text-gray-400 text-xs">USD per token</div>
                     </div>
                     <input
                       type="number"
                       placeholder="0.00"
+                      value={limitPrice}
+                      onChange={(e) => setLimitPrice(e.target.value)}
                       className="w-full bg-transparent text-white text-lg font-medium outline-none"
                     />
                   </div>
+
+                  {/* Amount Input */}
                   <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-gray-300 text-xs font-medium">Amount</label>
+                      <div className="text-gray-400 text-xs">
+                        Balance: {(() => {
+                          if (limitOrderType === 'buy') {
+                            return coreYield.userBalances[selectedAsset]?.pt || '0'
+                          } else {
+                            return coreYield.userBalances[selectedAsset]?.yt || '0'
+                          }
+                        })()}
+                      </div>
                     </div>
                     <input
                       type="number"
                       placeholder="0"
+                      value={limitAmount}
+                      onChange={(e) => setLimitAmount(e.target.value)}
                       className="w-full bg-transparent text-white text-lg font-medium outline-none"
                     />
                   </div>
-                  <button className="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-all duration-200 text-sm shadow-lg shadow-purple-600/25 hover:shadow-purple-600/40">
-                    Place Limit Order
+
+                  {/* Order Summary */}
+                  <div className="bg-gray-700/50 rounded-xl p-3 border border-gray-600/30">
+                    <div className="text-gray-300 text-xs font-medium mb-2">Order Summary</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Type:</span>
+                        <span className="text-white">{limitOrderType === 'buy' ? 'Buy PT' : 'Sell YT'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Price:</span>
+                        <span className="text-white">${limitPrice || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Amount:</span>
+                        <span className="text-white">{limitAmount || '0'} tokens</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Total Value:</span>
+                        <span className="text-white">
+                          ${(() => {
+                            const price = parseFloat(limitPrice) || 0
+                            const amount = parseFloat(limitAmount) || 0
+                            return (price * amount).toFixed(2)
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      await coreYield.placeLimitOrder(selectedAsset, limitOrderType, limitPrice, limitAmount)
+                      if (coreYield.transactionStatuses.limitOrder === 'success') {
+                        setLimitPrice('')
+                        setLimitAmount('')
+                      }
+                    }}
+                    disabled={!limitPrice || !limitAmount || parseFloat(limitPrice) <= 0 || parseFloat(limitAmount) <= 0 || coreYield.transactionStatuses.limitOrder === 'pending'}
+                    className="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-200 text-sm shadow-lg shadow-purple-600/25 hover:shadow-purple-600/40"
+                  >
+                    {coreYield.transactionStatuses.limitOrder === 'pending' ? 'Processing...' : 'Place Limit Order'}
                   </button>
           </div>
         )}
@@ -2432,6 +2765,32 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
       </div>
     )
   }
+
+  // Get the market key for the selected asset
+  const getMarketKey = (asset: string) => {
+    if (asset === 'stCORE') return 'stCORE_0'
+    if (asset === 'lstBTC') return 'lstBTC_0'
+    if (asset === 'dualCORE') return 'dualCORE_0'
+    return 'stCORE_0' // Default fallback
+  }
+
+  // State for lock period info
+  const [lockPeriodInfo, setLockPeriodInfo] = useState<any>(null)
+  
+  // Get lock period info when component mounts or user changes
+  useEffect(() => {
+    const fetchLockPeriodInfo = async () => {
+      if (coreYield.address) {
+        const info = await coreYield.getLockPeriodInfo()
+        setLockPeriodInfo(info)
+      }
+    }
+    
+    fetchLockPeriodInfo()
+    const interval = setInterval(fetchLockPeriodInfo, 60000) // Update every minute
+    
+    return () => clearInterval(interval)
+  }, [coreYield.address, coreYield.getLockPeriodInfo])
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -2628,19 +2987,42 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
 
           {/* Claimable Yield */}
           <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
-            <div className="flex items-center space-x-3 mb-2">
-              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <span className="text-blue-400 text-lg">🤲</span>
+                          <div className="flex items-center space-x-3 mb-2">
+                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <span className="text-blue-400 text-lg">🤲</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">My Claimable Yield & Rewards</h3>
+                </div>
               </div>
-              <div>
-                <h3 className="text-white font-semibold text-sm">My Claimable Yield & Rewards</h3>
-              </div>
+            <div className="text-2xl font-bold text-white mb-1">
+              {(() => {
+                const totalClaimable = Object.values(coreYield.userBalances).reduce((total, balance) => {
+                  return total + parseFloat(balance.claimableYield || '0')
+                }, 0)
+                return totalClaimable > 0 ? `${totalClaimable.toFixed(4)} ${selectedAsset}` : 'Nothing to Claim'
+              })()}
             </div>
-            <div className="text-2xl font-bold text-white mb-1">$0</div>
             <div className="flex items-center justify-between">
               <p className="text-gray-400 text-xs">Available to claim</p>
-              <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors">
-                Claim
+              <button 
+                onClick={() => {
+                  const totalClaimable = Object.values(coreYield.userBalances).reduce((total, balance) => {
+                    return total + parseFloat(balance.claimableYield || '0')
+                  }, 0)
+                  if (totalClaimable > 0) {
+                    coreYield.claimYield(selectedAsset)
+                  }
+                }}
+                disabled={(() => {
+                  const totalClaimable = Object.values(coreYield.userBalances).reduce((total, balance) => {
+                    return total + parseFloat(balance.claimableYield || '0')
+                  }, 0)
+                  return totalClaimable <= 0 || coreYield.transactionStatuses.claim === 'pending'
+                })()}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-xs font-medium rounded transition-colors"
+              >
+                {coreYield.transactionStatuses.claim === 'pending' ? 'Processing...' : 'Claim'}
               </button>
             </div>
           </div>

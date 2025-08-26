@@ -24,6 +24,7 @@ export const ManageTab: React.FC<ManageTabProps> = ({
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeDirection, setTradeDirection] = useState<'PT_TO_YT' | 'YT_TO_PT'>('PT_TO_YT')
   const [selectedAsset, setSelectedAsset] = useState<'dualCORE' | 'stCORE' | 'lstBTC'>('dualCORE')
+  const [selectedMarket, setSelectedMarket] = useState<string>('stCORE_0') // Default to first stCORE market
 
   // Use the PT/YT protocol hook
   const {
@@ -40,12 +41,18 @@ export const ManageTab: React.FC<ManageTabProps> = ({
     mintTokens
   } = useCoreYield()
 
-  // Asset options for PT/YT operations
+  // Asset options for PT/YT operations - updated to use market keys
   const assetOptions = [
-    { key: 'dualCORE', label: 'Dual CORE', icon: '⚡' },
-    { key: 'stCORE', label: 'Staked CORE', icon: '🔥' },
-    { key: 'lstBTC', label: 'Liquid Staked BTC', icon: '₿' }
+    { key: 'dualCORE', label: 'Dual CORE', icon: '⚡', marketKey: 'dualCORE_0' },
+    { key: 'stCORE', label: 'Staked CORE', icon: '🔥', marketKey: 'stCORE_0' },
+    { key: 'lstBTC', label: 'Liquid Staked BTC', icon: '₿', marketKey: 'lstBTC_0' }
   ] as const
+
+  // Get the market key for the selected asset
+  const getMarketKey = (asset: string) => {
+    const option = assetOptions.find(opt => opt.key === asset)
+    return option?.marketKey || 'stCORE_0'
+  }
 
   // Safe access to hook data with fallbacks - using actual available properties
   const coreBalance = currentHook?.coreBalance ? formatUnits(currentHook.coreBalance.value, currentHook.coreBalance.decimals) : '0'
@@ -103,7 +110,8 @@ export const ManageTab: React.FC<ManageTabProps> = ({
     if (!wrapAmount || parseFloat(wrapAmount) <= 0) return
     
     try {
-      await wrapToSY(selectedAsset, wrapAmount)
+      const marketKey = getMarketKey(selectedAsset)
+      await wrapToSY(marketKey, wrapAmount)
       setWrapAmount('')
       // TODO: Implement refresh functionality
     } catch (error) {
@@ -115,7 +123,8 @@ export const ManageTab: React.FC<ManageTabProps> = ({
     if (!splitAmount || parseFloat(splitAmount) <= 0) return
     
     try {
-      await splitSY(selectedAsset, splitAmount)
+      const marketKey = getMarketKey(selectedAsset)
+      await splitSY(marketKey, splitAmount)
       setSplitAmount('')
       // TODO: Implement refresh functionality
     } catch (error) {
@@ -127,7 +136,8 @@ export const ManageTab: React.FC<ManageTabProps> = ({
     if (!mergePTAmount || !mergeYTAmount || parseFloat(mergePTAmount) <= 0 || parseFloat(mergeYTAmount) <= 0) return
     
     try {
-      await mergePTYT(selectedAsset, mergePTAmount, mergeYTAmount)
+      const marketKey = getMarketKey(selectedAsset)
+      await mergePTYT(marketKey, mergePTAmount, mergeYTAmount)
       setMergePTAmount('')
       setMergeYTAmount('')
       // TODO: Implement refresh functionality
@@ -140,7 +150,8 @@ export const ManageTab: React.FC<ManageTabProps> = ({
     if (!unwrapAmount || parseFloat(unwrapAmount) <= 0) return
     
     try {
-      await unwrapFromSY(selectedAsset, unwrapAmount)
+      const marketKey = getMarketKey(selectedAsset)
+      await unwrapFromSY(marketKey, unwrapAmount)
       setUnwrapAmount('')
       // TODO: Implement refresh functionality
     } catch (error) {

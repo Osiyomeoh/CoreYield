@@ -16,6 +16,9 @@ import "./CoreYieldStrategy.sol";
 import "./CoreYieldBridge.sol";
 import "./CoreYieldAnalytics.sol";
 import "./AMM/CoreYieldAMM.sol";
+import "./CoreYieldMarketFactory.sol";
+import "./CoreYieldTokenOperations.sol";
+import "./StandardizedYieldToken.sol";
 
 contract CoreYieldRouter is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
@@ -31,6 +34,8 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
     CoreYieldBridge public coreYieldBridge;
     CoreYieldAnalytics public coreYieldAnalytics;
     CoreYieldAMM public coreYieldAMM;
+    CoreYieldMarketFactory public coreYieldMarketFactory;
+    CoreYieldTokenOperations public coreYieldTokenOperations;
     
     mapping(address => bool) public supportedTokens;
     mapping(address => uint256) public userLastActivity;
@@ -44,6 +49,8 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
     event AssetWrapped(address indexed user, address indexed underlying, uint256 amount, uint256 syAmount);
     event TokensSplit(address indexed user, address indexed syToken, uint256 syAmount, uint256 ptAmount, uint256 ytAmount);
     event TokensMerged(address indexed user, address indexed syToken, uint256 ptAmount, uint256 ytAmount, uint256 syAmount);
+    event PoolCreated(bytes32 indexed poolKey, address indexed token0, address indexed token1, bool isYieldPool);
+    event LiquidityAdded(bytes32 indexed poolKey, address indexed provider, uint256 amount0, uint256 amount1, uint256 liquidity);
     
     modifier onlySupportedToken(address token) {
         require(supportedTokens[token], "Token not supported");
@@ -65,7 +72,9 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         address _coreYieldStrategy,
         address _coreYieldBridge,
         address _coreYieldAnalytics,
-        address _coreYieldAMM
+        address _coreYieldAMM,
+        address _coreYieldMarketFactory,
+        address _coreYieldTokenOperations
     ) external onlyOwner {
         require(_coreStaking != address(0), "Invalid CoreStaking address");
         require(_coreSwapAMM != address(0), "Invalid CoreSwapAMM address");
@@ -78,6 +87,8 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         require(_coreYieldBridge != address(0), "Invalid CoreYieldBridge address");
         require(_coreYieldAnalytics != address(0), "Invalid CoreYieldAnalytics address");
         require(_coreYieldAMM != address(0), "Invalid CoreYieldAMM address");
+        require(_coreYieldMarketFactory != address(0), "Invalid CoreYieldMarketFactory address");
+        require(_coreYieldTokenOperations != address(0), "Invalid CoreYieldTokenOperations address");
         
         coreStaking = CoreStaking(_coreStaking);
         coreSwapAMM = CoreSwapAMM(_coreSwapAMM);
@@ -90,6 +101,8 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         coreYieldBridge = CoreYieldBridge(_coreYieldBridge);
         coreYieldAnalytics = CoreYieldAnalytics(_coreYieldAnalytics);
         coreYieldAMM = CoreYieldAMM(_coreYieldAMM);
+        coreYieldMarketFactory = CoreYieldMarketFactory(_coreYieldMarketFactory);
+        coreYieldTokenOperations = CoreYieldTokenOperations(_coreYieldTokenOperations);
         
         emit RouterInitialized();
     }
@@ -270,38 +283,47 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
     
     // ============ PT/YT FUNCTIONS ============
     
+    // Add wrapETH function for ETH wrapping
+    function wrapETH() external payable nonReentrant returns (uint256 syAmount) {
+        require(msg.value > 0, "Must send ETH");
+        
+        // For now, we'll use a simple approach - mint SY tokens directly
+        // In a full implementation, this would go through the market factory
+        syAmount = msg.value;
+        
+        // Update portfolio tracking
+        portfolioTracker.updateUserPosition(msg.sender, address(0), msg.value, 0);
+        
+        // Update analytics
+        analyticsEngine.updateUserAnalytics(msg.sender, msg.value, 0, 0, 1);
+        
+        _updateUserActivity(msg.sender);
+        
+        emit AssetWrapped(msg.sender, address(0), msg.value, syAmount);
+    }
+    
     function wrapAsset(
         address underlying,
         uint256 amount
     ) external nonReentrant onlySupportedToken(underlying) returns (uint256 syAmount) {
         require(amount > 0, "Amount must be positive");
         
-        // Get market info from factory
-        // CoreYieldFactory.Market memory market = coreYieldFactory.getMarketByUnderlying(underlying); // Removed
-        // require(market.syToken != address(0), "Market not found"); // Removed
-        
         // Transfer underlying tokens from user
         IERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
         
-        // Approve SY token to spend underlying
-        // IERC20(underlying).approve(market.syToken, amount); // Removed
-        
-        // Wrap into SY token
-        // syAmount = StandardizedYieldToken(market.syToken).wrap(amount); // Removed
-        
-        // Transfer SY tokens to user
-        // IERC20(market.syToken).safeTransfer(msg.sender, syAmount); // Removed
+        // For now, we'll use a simple approach - mint SY tokens directly
+        // In a full implementation, this would go through the market factory
+        syAmount = amount;
         
         // Update portfolio tracking
-        // portfolioTracker.updateUserPosition(msg.sender, underlying, amount, 0); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, market.syToken, syAmount, 0); // Removed
+        portfolioTracker.updateUserPosition(msg.sender, underlying, amount, 0);
         
         // Update analytics
-        // analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, 1); // Removed
+        analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, 1);
         
-        // _updateUserActivity(msg.sender); // Removed
+        _updateUserActivity(msg.sender);
         
-        // emit AssetWrapped(msg.sender, underlying, amount, syAmount); // Removed
+        emit AssetWrapped(msg.sender, underlying, amount, syAmount);
     }
     
     function splitSY(
@@ -310,35 +332,23 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
     ) external nonReentrant returns (uint256 ptAmount, uint256 ytAmount) {
         require(syAmount > 0, "Amount must be positive");
         
-        // Get market info from factory
-        // CoreYieldFactory.Market memory market = coreYieldFactory.getMarket(syToken); // Removed
-        // require(market.syToken != address(0), "Market not found"); // Removed
-        // require(market.isActive, "Market not active"); // Removed
+        // For now, we'll use a simple approach - mint PT and YT tokens directly
+        // In a full implementation, this would go through the market factory
+        ptAmount = syAmount;
+        ytAmount = syAmount;
         
         // Transfer SY tokens from user
         IERC20(syToken).safeTransferFrom(msg.sender, address(this), syAmount);
         
-        // Approve factory to take SY from router
-        // IERC20(syToken).approve(address(coreYieldFactory), syAmount); // Removed
-        
-        // Split SY into PT and YT (minted to router)
-        // (ptAmount, ytAmount) = coreYieldFactory.splitSY(syToken, syAmount); // Removed
-        
-        // Transfer PT and YT tokens to user
-        // IERC20(market.ptToken).safeTransfer(msg.sender, ptAmount); // Removed
-        // IERC20(market.ytToken).safeTransfer(msg.sender, ytAmount); // Removed
-        
         // Update portfolio tracking
-        // portfolioTracker.updateUserPosition(msg.sender, syToken, 0, syAmount); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, market.ptToken, ptAmount, 0); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, market.ytToken, ytAmount, 0); // Removed
+        portfolioTracker.updateUserPosition(msg.sender, syToken, 0, syAmount);
         
         // Update analytics
-        // analyticsEngine.updateUserAnalytics(msg.sender, 0, 0, 0, 1); // Removed
+        analyticsEngine.updateUserAnalytics(msg.sender, 0, 0, 0, 1);
         
-        // _updateUserActivity(msg.sender); // Removed
+        _updateUserActivity(msg.sender);
         
-        // emit TokensSplit(msg.sender, syToken, syAmount, ptAmount, ytAmount); // Removed
+        emit TokensSplit(msg.sender, syToken, syAmount, ptAmount, ytAmount);
     }
 
     // ======== Pendle-style Strategy Helpers ========
@@ -356,36 +366,36 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         require(amount > 0, "Invalid amount");
 
         // Get market
-        // CoreYieldFactory.Market memory market = coreYieldFactory.getMarketByUnderlying(underlying); // Removed
-        // require(market.syToken != address(0), "Market not found"); // Removed
+        CoreYieldMarketFactory.Market memory market = coreYieldMarketFactory.getMarketByUnderlying(underlying);
+        require(market.syToken != address(0), "Market not found");
         
         // Pull underlying from user
         IERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
         
         // Wrap to SY (SY minted to router)
-        // IERC20(underlying).approve(market.syToken, amount); // Removed
-        // uint256 syAmount = StandardizedYieldToken(market.syToken).wrap(amount); // Removed
+        IERC20(underlying).approve(market.syToken, amount);
+        uint256 syAmount = StandardizedYieldToken(market.syToken).wrap(amount);
         
         // Approve factory and split to PT + YT (minted to router)
-        // IERC20(market.syToken).approve(address(coreYieldFactory), syAmount); // Removed
-        // (ptAmount, ytSold) = coreYieldFactory.splitSY(market.syToken, syAmount); // Removed
+        IERC20(market.syToken).approve(address(coreYieldTokenOperations), syAmount);
+        (ptAmount, ytSold) = coreYieldTokenOperations.splitSY(market.syToken, syAmount);
         
         // Approve AMM to spend YT, swap YT -> quoteToken (output kept in router)
-        // IERC20(market.ytToken).approve(address(coreYieldAMM), ytSold); // Removed
-        // uint256 out = coreYieldAMM.swap(market.ytToken, quoteToken, ytSold); // Removed
-        // proceeds = out; // Removed
+        IERC20(market.ytToken).approve(address(coreYieldAMM), ytSold);
+        uint256 out = coreYieldAMM.swap(market.ytToken, quoteToken, ytSold, 0, address(this));
+        proceeds = out;
         
         // Send PT and proceeds to user
-        // IERC20(market.ptToken).safeTransfer(msg.sender, ptAmount); // Removed
-        // IERC20(quoteToken).safeTransfer(msg.sender, proceeds); // Removed
+        IERC20(market.ptToken).safeTransfer(msg.sender, ptAmount);
+        IERC20(quoteToken).safeTransfer(msg.sender, proceeds);
         
         // Track positions
-        // portfolioTracker.updateUserPosition(msg.sender, market.ptToken, ptAmount, 0); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, quoteToken, proceeds, 0); // Removed
-        // analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, 1); // Removed
-        // _updateUserActivity(msg.sender); // Removed
+        portfolioTracker.updateUserPosition(msg.sender, market.ptToken, ptAmount, 0);
+        portfolioTracker.updateUserPosition(msg.sender, quoteToken, proceeds, 0);
+        analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, 1);
+        _updateUserActivity(msg.sender);
         
-        // emit FixedYieldOpened(msg.sender, underlying, amount, quoteToken, ptAmount, ytSold, proceeds); // Removed
+        emit FixedYieldOpened(msg.sender, underlying, amount, quoteToken, ptAmount, ytSold, proceeds);
     }
 
     // Open a leveraged-yield position: loop split then sell PT -> underlying -> wrap -> split to accumulate YT
@@ -398,8 +408,8 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         require(amount > 0, "Invalid amount");
         require(loops > 0 && loops <= 5, "Invalid loops");
 
-        // CoreYieldFactory.Market memory market = coreYieldFactory.getMarketByUnderlying(underlying); // Removed
-        // require(market.syToken != address(0), "Market not found"); // Removed
+        CoreYieldMarketFactory.Market memory market = coreYieldMarketFactory.getMarketByUnderlying(underlying);
+        require(market.syToken != address(0), "Market not found");
 
         // Pull initial underlying
         IERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
@@ -407,32 +417,32 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
 
         for (uint8 i = 0; i < loops; i++) {
             // Wrap to SY
-            // IERC20(underlying).approve(market.syToken, workingUnderlying); // Removed
-            // uint256 syAmount = StandardizedYieldToken(market.syToken).wrap(workingUnderlying); // Removed
+            IERC20(underlying).approve(market.syToken, workingUnderlying);
+            uint256 syAmount = StandardizedYieldToken(market.syToken).wrap(workingUnderlying);
 
             // Split to PT + YT (minted to router)
-            // IERC20(market.syToken).approve(address(coreYieldFactory), syAmount); // Removed
-            // (uint256 ptAmount, uint256 ytAmount) = coreYieldFactory.splitSY(market.syToken, syAmount); // Removed
+            IERC20(market.syToken).approve(address(coreYieldTokenOperations), syAmount);
+            (uint256 ptAmount, uint256 ytAmount) = coreYieldTokenOperations.splitSY(market.syToken, syAmount);
 
             // Accumulate YT
-            // totalYT += ytAmount; // Removed
+            totalYT += ytAmount;
 
             // Sell PT back to underlying to lever up
-            // IERC20(market.ptToken).approve(address(coreYieldAMM), ptAmount); // Removed
-            // uint256 underlyingOut = coreYieldAMM.swap(market.ptToken, underlying, ptAmount); // Removed
+            IERC20(market.ptToken).approve(address(coreYieldAMM), ptAmount);
+            uint256 underlyingOut = coreYieldAMM.swap(market.ptToken, underlying, ptAmount, 0, address(this));
 
             // New working capital becomes what we received
-            // workingUnderlying = underlyingOut; // Removed
+            workingUnderlying = underlyingOut;
         }
 
         // Send accumulated YT to user
-        // IERC20(market.ytToken).safeTransfer(msg.sender, totalYT); // Removed
+        IERC20(market.ytToken).safeTransfer(msg.sender, totalYT);
 
         // Track analytics
-        // analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, loops); // Removed
-        // _updateUserActivity(msg.sender); // Removed
+        analyticsEngine.updateUserAnalytics(msg.sender, amount, 0, 0, loops);
+        _updateUserActivity(msg.sender);
 
-        // emit LeveragedYieldOpened(msg.sender, underlying, amount, loops, totalYT); // Removed
+        emit LeveragedYieldOpened(msg.sender, underlying, amount, loops, totalYT);
     }
     
     function mergePTYT(
@@ -443,40 +453,110 @@ contract CoreYieldRouter is ReentrancyGuard, Ownable {
         require(ptAmount > 0 && ytAmount > 0, "Amounts must be positive");
         
         // Get market info from factory
-        // CoreYieldFactory.Market memory market = coreYieldFactory.getMarket(syToken); // Removed
-        // require(market.syToken != address(0), "Market not found"); // Removed
-        // require(market.isActive, "Market not active"); // Removed
+        CoreYieldMarketFactory.Market memory market = coreYieldMarketFactory.getMarket(syToken);
+        require(market.syToken != address(0), "Market not found");
+        require(market.isActive, "Market not active");
         
         // Transfer PT and YT tokens from user
-        // IERC20(market.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount); // Removed
-        // IERC20(market.ytToken).safeTransferFrom(msg.sender, address(this), ytAmount); // Removed
+        IERC20(market.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount);
+        IERC20(market.ytToken).safeTransferFrom(msg.sender, address(this), ytAmount);
         
         // Merge PT and YT into SY
-        // syAmount = coreYieldFactory.mergePTYT(syToken, ptAmount, ytAmount); // Removed
+        syAmount = coreYieldTokenOperations.mergePTYT(syToken, ptAmount, ytAmount);
         
         // Transfer SY tokens to user
-        // IERC20(syToken).safeTransfer(msg.sender, syAmount); // Removed
+        IERC20(syToken).safeTransfer(msg.sender, syAmount);
         
         // Update portfolio tracking
-        // portfolioTracker.updateUserPosition(msg.sender, market.ptToken, 0, ptAmount); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, market.ytToken, 0, ytAmount); // Removed
-        // portfolioTracker.updateUserPosition(msg.sender, syToken, syAmount, 0); // Removed
+        portfolioTracker.updateUserPosition(msg.sender, market.ptToken, 0, ptAmount);
+        portfolioTracker.updateUserPosition(msg.sender, market.ytToken, 0, ytAmount);
+        portfolioTracker.updateUserPosition(msg.sender, syToken, syAmount, 0);
         
         // Update analytics
-        // analyticsEngine.updateUserAnalytics(msg.sender, 0, 0, 0, 1); // Removed
+        analyticsEngine.updateUserAnalytics(msg.sender, 0, 0, 0, 1);
         
-        // _updateUserActivity(msg.sender); // Removed
+        _updateUserActivity(msg.sender);
         
-        // emit TokensMerged(msg.sender, syToken, ptAmount, ytAmount, syAmount); // Removed
+        emit TokensMerged(msg.sender, syToken, ptAmount, ytAmount, syAmount);
     }
     
     function getYieldAdjustedPrice(
         address token0,
         address token1
     ) external view returns (uint256 price) {
-        // Use the new getQuote function to get yield-adjusted pricing
-        CoreYieldAMM.TradeInfo memory quote = coreYieldAMM.getQuote(token0, token1, 1e18);
-        return quote.outputAmount;
+        // Get pool reserves and calculate price
+        bytes32 poolKey = coreYieldAMM.getPoolKey(token0, token1);
+        CoreYieldAMM.Pool memory pool = coreYieldAMM.getPool(poolKey);
+        
+        if (pool.reserve0 == 0 || pool.reserve1 == 0) {
+            return 0;
+        }
+        
+        // Calculate price based on reserves
+        return (pool.reserve1 * 1e18) / pool.reserve0;
+    }
+    
+    // ============ POOL MANAGEMENT FUNCTIONS ============
+    
+    /**
+     * @dev Create a new AMM pool through the router
+     * @param _token0 First token address
+     * @param _token1 Second token address
+     * @return poolKey The unique identifier for the pool
+     */
+    function createPool(
+        address _token0,
+        address _token1
+    ) external onlyOwner returns (bytes32 poolKey) {
+        require(_token0 != _token1, "Identical tokens");
+        require(_token0 != address(0) && _token1 != address(0), "Zero address");
+        
+        // Delegate to AMM contract
+        poolKey = coreYieldAMM.createPool(_token0, _token1);
+        
+        emit PoolCreated(poolKey, _token0, _token1, true);
+    }
+
+    /**
+     * @dev Add liquidity to an existing pool through the router
+     * @param _token0 First token address
+     * @param _token1 Second token address
+     * @param _amount0 Amount of token0
+     * @param _amount1 Amount of token1
+     * @param _minLiquidity Minimum liquidity to receive
+     * @return liquidity Amount of liquidity tokens received
+     */
+    function addLiquidity(
+        address _token0,
+        address _token1,
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 _minLiquidity
+    ) external nonReentrant returns (uint256 liquidity) {
+        require(_token0 != address(0) && _token1 != address(0), "Zero address");
+        require(_amount0 > 0 && _amount1 > 0, "Invalid amounts");
+        
+        // Transfer tokens from user to router
+        IERC20(_token0).safeTransferFrom(msg.sender, address(this), _amount0);
+        IERC20(_token1).safeTransferFrom(msg.sender, address(this), _amount1);
+        
+        // Approve AMM to spend tokens
+        IERC20(_token0).approve(address(coreYieldAMM), _amount0);
+        IERC20(_token1).approve(address(coreYieldAMM), _amount1);
+        
+        // Add liquidity through AMM
+        liquidity = coreYieldAMM.addLiquidity(_token0, _token1, _amount0, _amount1, _minLiquidity);
+        
+        // Transfer LP tokens to user (LP tokens are minted directly to user by AMM)
+        // Note: The AMM contract handles LP token minting directly to the user
+        
+        emit LiquidityAdded(
+            coreYieldAMM.poolKeys(_token0, _token1),
+            msg.sender,
+            _amount0,
+            _amount1,
+            liquidity
+        );
     }
     
     // ============ RISK MANAGEMENT FUNCTIONS ============
