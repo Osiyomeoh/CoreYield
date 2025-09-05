@@ -57,14 +57,14 @@ interface MainDashboardProps {
   onShowEducation?: (level?: 'beginner' | 'intermediate' | 'advanced') => void
 }
 
-type DashboardView = 'markets' | 'pools' | 'points' | 'dashboard' | 'veCORE' | 'coreswap' | 'bridge'
+type DashboardView = 'markets' | 'pools' | 'dashboard' | 'trading'
 type MarketFilter = 'all' | 'prime' | 'favorites' | 'new'
 type SortOption = 'default' | 'apy' | 'tvl' | 'volume' | 'maturity'
 type ViewMode = 'list' | 'grid' | 'detailed'
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation }) => {
   // Main Navigation State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'markets' | 'pools' | 'points' | 'governance' | 'swap' | 'trading' | 'veCORE' | 'coreswap' | 'bridge'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'markets' | 'pools' | 'trading'>('dashboard')
   
   // Market State
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('all')
@@ -85,7 +85,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   const [displayMode, setDisplayMode] = useState<'usd' | 'underlying'>('usd')
   
   // Governance State
-  const [governanceView, setGovernanceView] = useState<'overview' | 'lock' | 'vote' | 'app'>('overview')
+  const [governanceView, setGovernanceView] = useState<'overview' | 'dashboard' | 'lock' | 'vote' | 'app'>('overview')
   const [lockAmount, setLockAmount] = useState('')
   const [lockDuration, setLockDuration] = useState(365)
   
@@ -392,48 +392,17 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
 
                     {/* Navigation */}
           <nav className="hidden lg:flex items-center space-x-6">
-            <div className="relative group">
-              <button className="flex items-center space-x-1 text-gray-300 hover:text-white">
-                <span>Education</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-              </button>
-              {/* Education Dropdown */}
-              <div className="absolute top-full left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="p-2">
-                  <button 
-                    onClick={() => onShowEducation?.('beginner')}
-                    className="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded"
-                  >
-                    Learn
-                  </button>
-                  <button 
-                    onClick={() => onShowEducation?.('intermediate')}
-                    className="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded"
-                  >
-                    Core Academy
-                  </button>
-                  <button 
-                    onClick={() => onShowEducation?.('advanced')}
-                    className="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded"
-                  >
-                    Docs
-                  </button>
-                  <button className="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded">
-                    Core Videos
-                  </button>
-            </div>
-          </div>
-            </div>
+                        <button 
+              onClick={() => onShowEducation?.()}
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Education
+            </button>
 
             {[
               { id: 'markets', label: 'Markets' },
               { id: 'pools', label: 'Pools' },
-              { id: 'points', label: 'Points Markets' },
-              { id: 'dashboard', label: 'Dashboard' },
-              { id: 'veCORE', label: 'veCORE' },
-              { id: 'bridge', label: 'Bridge' }
+              { id: 'dashboard', label: 'Dashboard' }
             ].map((item) => (
               <button
                 key={item.id}
@@ -445,13 +414,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                 {item.label}
               </button>
             ))}
-            
-            <button
-              onClick={() => setCurrentView('coreswap')}
-              className="px-3 py-1 bg-teal-500 hover:bg-teal-600 text-white font-medium rounded-lg transition-colors text-sm"
-            >
-              CoreSwap
-            </button>
           </nav>
 
           {/* Right Side */}
@@ -675,13 +637,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
       </div>
     )
 
-  // Render Points Markets
-  const renderPointsView = () => (
-    <div className="w-full px-6 py-6 space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-white mb-2">Points Market</h1>
-        <p className="text-gray-400">Earn and trade ecosystem points for maximum rewards</p>
-                </div>
+
+
 
       {/* Chain Selector for Points */}
       <ChainSelector 
@@ -767,7 +724,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
               <div className="text-2xl mb-2">⚖️</div>
               <div className="text-gray-400 text-sm">Risk Score</div>
               <div className="text-white font-semibold">Low</div>
-              <div className="text-green-400 text-xs">Conservative</div>
+              <div className="text-blue-400 text-xs">Conservative</div>
             </div>
           </div>
         </div>
@@ -779,25 +736,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
         </div>
       </div>
 
-      {/* Points Markets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {pointsMarkets.length > 0 ? (
-          pointsMarkets.map((market) => (
-            <PointsCard
-              key={market.asset}
-              market={market}
-              onTrade={() => console.log('Trade points', market.asset)}
-            />
-          ))
-        ) : (
-          <div className="text-center text-gray-400 py-8">
-            <p>No points markets available yet</p>
-            <p className="text-sm">Connect your wallet to see available markets</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+
 
   // Render Dashboard (Portfolio) View
   const renderDashboardView = () => (
@@ -843,13 +782,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
         </button>
         
         <button 
-          onClick={() => setCurrentView('bridge')}
+          onClick={() => setCurrentView('markets')}
           className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-4 px-6 rounded-xl transition-colors flex items-center justify-center space-x-3"
         >
-          <span className="text-2xl">🌉</span>
+          <span className="text-2xl">📊</span>
           <div className="text-left">
-            <div className="font-semibold">Bridge Assets</div>
-            <div className="text-sm text-purple-200">Cross-chain transfers</div>
+            <div className="font-semibold">View Markets</div>
+            <div className="text-sm text-purple-200">Explore yield opportunities</div>
           </div>
         </button>
       </div>
@@ -1056,252 +995,233 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   // Render Governance (veCORE) View
   const renderGovernanceView = () => (
     <div className="w-full px-6 py-6 space-y-6">
-      {/* Governance Header */}
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'lock', label: 'Lock' },
-              { id: 'vote', label: 'Vote' },
-              { id: 'app', label: 'App' }
-                ].map((tab) => (
-                  <button 
-                    key={tab.id}
-                onClick={() => setGovernanceView(tab.id as any)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  governanceView === tab.id
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                }`}
-              >
-                {tab.label}
-                  </button>
-                ))}
-                </div>
-                              <CustomConnectButton />
+      {/* Top Navigation */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-6">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'dashboard', label: 'Dashboard' },
+            { id: 'lock', label: 'Lock' },
+            { id: 'vote', label: 'Vote' },
+            { id: 'app', label: 'App' }
+          ].map((tab) => (
+            <button 
+              key={tab.id}
+              onClick={() => setGovernanceView(tab.id as any)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                governanceView === tab.id
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <CustomConnectButton />
+      </div>
+
+      {/* Tab Content */}
+      {governanceView === 'overview' && (
+        <>
+          {/* veDashboard Header */}
+          <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-8 text-center mb-8">
+            <h1 className="text-4xl font-bold text-white mb-4">veDashboard</h1>
+            <p className="text-gray-300 text-lg mb-6 max-w-3xl mx-auto">
+              Lock your CORE to get veCORE. Boost rewards, channel incentives and participate in governance with veCORE.
+            </p>
+            <div className="flex items-center justify-center space-x-4">
+              <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-green-600 transition-all">
+                Buy CORE
+              </button>
+              <button className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-all">
+                Claim Rewards
+              </button>
             </div>
+          </div>
 
-        {governanceView === 'overview' && (
-          <div className="space-y-6">
-                <div className="text-center">
-              <h1 className="text-2xl font-bold text-white mb-2">Overview</h1>
-              <p className="text-gray-400">
-                Lock your CORE to get veCORE. Boost rewards, channel incentives and participate in governance with veCORE.
-              </p>
-                </div>
-
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">veCORE Fees since 31 Jul 2025</h3>
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className="text-3xl font-bold text-white">{globalStats.veCOREFees}</span>
-                  <span className="text-blue-400">📈</span>
-              </div>
-              </div>
-              
-              <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">veCORE Historical APR</h3>
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className="text-3xl font-bold text-white">{globalStats.historicalAPR}</span>
-                  <span className="text-green-400">🔄</span>
-              </div>
-              </div>
+          {/* Key Metrics Section */}
+          <div className="grid grid-cols-6 gap-4 mb-8">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">0</div>
+              <div className="text-gray-400 text-sm">My veCORE</div>
             </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">0</div>
+              <div className="text-gray-400 text-sm">My Locked CORE</div>
+              <div className="text-gray-500 text-xs">$0</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">N/A</div>
+              <div className="text-gray-400 text-sm">Unlock Date</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">0</div>
+              <div className="text-gray-400 text-sm">My CORE</div>
+              <div className="text-gray-500 text-xs">$0</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">$0</div>
+              <div className="text-gray-400 text-sm">My Rewards</div>
+              <div className="text-gray-500 text-xs">All-time: $0</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">$0</div>
+              <div className="text-gray-400 text-sm">Total Revenue</div>
+              <div className="text-gray-500 text-xs">Protocol</div>
+            </div>
+          </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                <p className="text-gray-400 text-sm">Revenue (Aug '25)</p>
-                <p className="text-white font-bold text-lg">$0.00</p>
-                </div>
-                <div className="text-center">
-                <p className="text-gray-400 text-sm">Total veCORE</p>
-                <p className="text-white font-bold text-lg">{globalStats.totalveCORE}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Total Locked CORE</p>
-                <p className="text-white font-bold text-lg">{globalStats.lockedCORE}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Avg Lock Duration</p>
-                <p className="text-white font-bold text-lg">{globalStats.avgLockDuration}</p>
-                </div>
-              </div>
+          <div className="text-center text-gray-400 mb-8">
+            Next Reward Distribution: 15 September 2025
+          </div>
 
-            {/* Risk Management Panel */}
-            <div className="bg-gradient-to-r from-red-600/10 to-orange-600/10 border border-red-500/20 rounded-xl p-6 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">⚠️ Risk Management</h3>
-              <p className="text-gray-400 text-sm mb-4">Monitor and manage portfolio risk across all governance positions</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">📊</div>
-                    <div className="text-gray-400 text-sm">Portfolio Risk</div>
-                    <div className="text-white font-semibold">Low</div>
-                    <div className="text-green-400 text-xs">Safe</div>
-                  </div>
+          {/* Two Panel Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Panel - My Vote */}
+            <div className="bg-gray-900/50 border border-gray-700/50 rounded-xl p-6">
+              <h3 className="text-xl font-semibold text-white mb-4">My Vote</h3>
+              <div className="text-center py-8">
+                <div className="text-4xl font-bold text-blue-400 mb-2">0 veCORE</div>
+                <div className="text-gray-400 mb-6">Current voting power</div>
+                <div className="w-24 h-24 bg-blue-600/20 border border-blue-500/30 rounded-lg mx-auto mb-6 flex items-center justify-center">
+                  <div className="text-3xl">🗳️</div>
                 </div>
-                
-                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">🎯</div>
-                    <div className="text-gray-400 text-sm">Max Drawdown</div>
-                    <div className="text-white font-semibold">5.2%</div>
-                    <div className="text-yellow-400 text-xs">Acceptable</div>
-                  </div>
-                </div>
-                
-                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">🚨</div>
-                    <div className="text-gray-400 text-sm">Risk Alerts</div>
-                    <div className="text-white font-semibold">0</div>
-                    <div className="text-green-400 text-xs">No Issues</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-center space-x-3">
-                <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                  Emergency Exit
-                </button>
-                <button className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors">
-                  Risk Report
-                </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                  Adjust Strategy
+                <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-green-600 transition-all">
+                  Revote
                 </button>
               </div>
             </div>
 
-            {/* Revenue Chart */}
-            <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Historical CoreYield Revenue</h3>
-              <p className="text-gray-400 text-sm mb-6">All time revenue: {globalStats.totalRevenue}</p>
-              
-              {/* Real Chart Data */}
-              <div className="h-64 bg-gray-800/50 rounded-lg flex items-end justify-center space-x-2 p-4">
-                {analyticsData && Array.isArray(analyticsData) && analyticsData.length > 0 ? (
-                  // Use available analytics data for chart
-                  analyticsData.map((value, index) => {
-                    const height = parseFloat(formatUnits(value as bigint, 18)) * 10
-                  return (
-                      <div
-                        key={index}
-                        className="bg-teal-500 rounded-t w-8 transition-all hover:bg-teal-400"
-                        style={{ height: `${Math.max(height, 20)}px` }}
-                      />
-                    )
-                  })
-                ) : (
-                  // Fallback chart when no data
-                  [1.2, 2.1, 1.8, 4.5, 3.2, 2.8, 1.9, 3.8, 2.4, 3.1, 2.7, 1.5].map((height, index) => (
-                    <div
-                      key={index}
-                      className="bg-teal-500 rounded-t w-8 transition-all hover:bg-teal-400"
-                      style={{ height: `${height * 40}px` }}
-                    />
-                  ))
-                )}
-                              </div>
-              <div className="flex justify-between text-xs text-gray-400 mt-2">
-                <span>Sep '24</span>
-                <span>Oct '24</span>
-                <span>Nov '24</span>
-                <span>Dec '24</span>
-                <span>Jan '25</span>
-                <span>Feb '25</span>
-                <span>Mar '25</span>
-                <span>Apr '25</span>
-                <span>May '25</span>
-                <span>Jun '25</span>
-                <span>Jul '25</span>
-                <span>Aug '25</span>
-                              </div>
-              </div>
-
-            {/* Top Voters */}
-            <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Top Voter* Jun 2025</h3>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
-                  <option>Jun 2025</option>
-                  <option>May 2025</option>
-                  <option>Apr 2025</option>
-                </select>
-              </div>
-
-                  <div className="space-y-3">
-                {[
-                  { rank: 1, user: '0xcd5...169b', rewards: '2,622.4324 USDT', apr: '103.2398 (32.17%)', balance: '25,418' },
-                  { rank: 2, user: '0x76a...4315', rewards: '106.4528 USDT', apr: '90.4898 (28.2%)', balance: '1,174' },
-                  { rank: 3, user: '0xb9e...614e', rewards: '96.1921 USDT', apr: '89.2298 (27.81%)', balance: '1,022' }
-                ].map((voter) => (
-                  <div key={voter.rank} className="grid grid-cols-5 gap-4 items-center py-2 hover:bg-gray-800/30 rounded-lg px-3">
-                    <div className="text-white font-medium">{voter.rank}</div>
-                    <div className="text-blue-400">{voter.user}</div>
-                    <div className="text-white">{voter.rewards}</div>
-                    <div className="text-green-400">{voter.apr}</div>
-                    <div className="text-white">{voter.balance}</div>
-                  </div>
-                ))}
+            {/* Right Panel - My veCORE Balance */}
+            <div className="bg-gray-900/50 border border-gray-700/50 rounded-xl p-6">
+              <h3 className="text-xl font-semibold text-white mb-4">My veCORE Balance</h3>
+              <div className="text-center py-8">
+                <div className="text-4xl font-bold text-green-400 mb-2">0</div>
+                <div className="text-gray-400 mb-6">Current balance</div>
+                <div className="w-24 h-24 bg-green-600/20 border border-green-500/30 rounded-lg mx-auto mb-6 flex items-center justify-center">
+                  <div className="text-3xl">🔒</div>
+                </div>
+                <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-green-600 transition-all">
+                  Lock CORE
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </>
+      )}
 
-        {governanceView === 'lock' && (
-                  <GovernanceTab />
-        )}
-
-        {governanceView === 'vote' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Governance Voting</h2>
-              <p className="text-gray-400">Participate in protocol governance with your veCORE tokens</p>
+      {governanceView === 'dashboard' && (
+        <div className="space-y-6">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">veCORE Dashboard</h1>
+            <p className="text-gray-400">Detailed metrics and governance statistics</p>
+          </div>
+          
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">veCORE Fees since 31 Jul 2025</h3>
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-3xl font-bold text-white">{globalStats.veCOREFees}</span>
+                <span className="text-blue-400">📈</span>
+              </div>
             </div>
             
             <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Active Proposals</h3>
-              <div className="space-y-4">
-                {[
-                          { id: 1, title: 'Increase yield farming rewards for stCORE pools', status: 'Active', ends: '0 days', votes: '0 veCORE' },
-        { id: 2, title: 'Add new BTCS staking markets', status: 'Active', ends: '0 days', votes: '0 veCORE' },
-        { id: 3, title: 'Protocol fee adjustment for Point Markets', status: 'Pending', ends: '0 days', votes: '0 veCORE' }
-                ].map((proposal) => (
-                  <div key={proposal.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                    <div className="flex items-center justify-between">
-                            <div>
-                        <h4 className="text-white font-medium mb-1">{proposal.title}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-gray-400">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            proposal.status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {proposal.status}
-                                </span>
-                          <span>Ends in {proposal.ends}</span>
-                          <span>{proposal.votes} total votes</span>
-                              </div>
-                            </div>
-                      <ActionButton
-                        onClick={() => console.log('Vote on proposal', proposal.id)}
-                        variant="primary"
-                        size="sm"
-                      >
-                        Vote
-                      </ActionButton>
-                          </div>
-              </div>
-                ))}
+              <h3 className="text-lg font-semibold text-white mb-4">veCORE Historical APR</h3>
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-3xl font-bold text-white">{globalStats.historicalAPR}</span>
+                <span className="text-green-400">🔄</span>
               </div>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">Revenue (Aug '25)</p>
+              <p className="text-white font-bold text-lg">$0.00</p>
             </div>
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">Total veCORE</p>
+              <p className="text-white font-bold text-lg">{globalStats.totalveCORE}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">Total Locked CORE</p>
+              <p className="text-white font-bold text-lg">{globalStats.lockedCORE}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">Avg Lock Duration</p>
+              <p className="text-white font-bold text-lg">{globalStats.avgLockDuration}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {governanceView === 'lock' && (
+        <div className="space-y-6">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Lock CORE for veCORE</h1>
+            <p className="text-gray-400">Lock your CORE tokens to receive veCORE and participate in governance</p>
+          </div>
+          <GovernanceTab />
+        </div>
+      )}
+
+      {governanceView === 'vote' && (
+        <div className="space-y-6">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Governance Voting</h1>
+            <p className="text-gray-400">Participate in protocol governance with your veCORE tokens</p>
+          </div>
+          
+          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Active Proposals</h3>
+            <div className="space-y-4">
+              {[
+                { id: 1, title: 'Increase yield farming rewards for stCORE pools', status: 'Active', ends: '0 days', votes: '0 veCORE' },
+                { id: 2, title: 'Add new BTCS staking markets', status: 'Active', ends: '0 days', votes: '0 veCORE' },
+                { id: 3, title: 'Protocol fee adjustment for Point Markets', status: 'Pending', ends: '0 days', votes: '0 veCORE' }
+              ].map((proposal) => (
+                <div key={proposal.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-white font-medium mb-1">{proposal.title}</h4>
+                      <div className="flex items-center space-x-4 text-sm text-gray-400">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          proposal.status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                        }`}>
+                          {proposal.status}
+                        </span>
+                        <span>Ends in {proposal.ends}</span>
+                        <span>{proposal.votes} total votes</span>
+                      </div>
+                    </div>
+                    <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                      Vote
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {governanceView === 'app' && (
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold text-white mb-4">Back to CoreYield</h2>
+          <p className="text-gray-400 mb-6">Return to the main CoreYield application</p>
+          <button 
+            onClick={() => setCurrentView('dashboard')}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-green-600 transition-all"
+          >
+            Go to CoreYield
+          </button>
+        </div>
+      )}
+    </div>
   )
 
   // Render Staking View
@@ -2803,11 +2723,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
       {/* Main View Router */}
       {currentView === 'markets' && renderMarketsView()}
       {currentView === 'pools' && renderPoolsView()}
-      {currentView === 'points' && renderPointsView()}
-      {currentView === 'veCORE' && renderGovernanceView()}
-      {currentView === 'coreswap' && renderSwapView()}
+      
       {currentView === 'trading' && renderTradingView()}
-      {currentView === 'bridge' && renderBridgeView()}
       
       {/* Dashboard View - PT/YT Interface */}
       {currentView === 'dashboard' && (
@@ -3095,16 +3012,16 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                 🚀 Create Strategy
               </button>
               <button 
-                onClick={() => setCurrentView('governance')}
+                onClick={() => setCurrentView('pools')}
                 className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
               >
-                ⚠️ Risk Management
+                🚀 Strategy Management
               </button>
               <button 
-                onClick={() => setCurrentView('bridge')}
+                onClick={() => setCurrentView('markets')}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
               >
-                🌉 Bridge Assets
+                📊 View Markets
               </button>
             </div>
           </div>
@@ -3187,10 +3104,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">⚠️ Risk Overview</h3>
                 <button 
-                  onClick={() => setCurrentView('governance')}
+                  onClick={() => setCurrentView('pools')}
                   className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"
                 >
-                  Manage Risk
+                  Manage Strategy
                 </button>
               </div>
               
@@ -3219,12 +3136,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
             {/* Bridge Summary */}
             <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">🌉 Bridge Status</h3>
+                <h3 className="text-lg font-semibold text-white">📊 Market Status</h3>
                 <button 
-                  onClick={() => setCurrentView('bridge')}
+                  onClick={() => setCurrentView('markets')}
                   className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
                 >
-                  Bridge Assets
+                  View Markets
                 </button>
               </div>
               

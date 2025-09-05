@@ -1,391 +1,520 @@
 import React, { useState, useEffect } from 'react'
 import { useCoreYield } from '../../../hooks/useCoreYield'
 import { CONTRACTS } from '@contracts/addresses'
+import { useAccount, useReadContract, useWriteContract } from 'wagmi'
+import { parseEther, formatUnits } from 'viem'
+import toast from 'react-hot-toast'
+
+// CoreGovernance ABI (actual deployed contract functions)
+const CoreGovernanceABI = [
+  {
+    "inputs": [
+      {"internalType": "address", "name": "user", "type": "address"}
+    ],
+    "name": "userVotingPower",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "string", "name": "title", "type": "string"},
+      {"internalType": "string", "name": "description", "type": "string"},
+      {"internalType": "uint256", "name": "duration", "type": "uint256"}
+    ],
+    "name": "createProposal",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"internalType": "bool", "name": "support", "type": "bool"},
+      {"internalType": "string", "name": "reason", "type": "string"}
+    ],
+    "name": "vote",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "proposalId", "type": "uint256"}],
+    "name": "executeProposal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "proposalId", "type": "uint256"}],
+    "name": "cancelProposal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "proposalId", "type": "uint256"}],
+    "name": "getProposalInfo",
+    "outputs": [
+      {"internalType": "address", "name": "proposer", "type": "address"},
+      {"internalType": "string", "name": "title", "type": "string"},
+      {"internalType": "string", "name": "description", "type": "string"},
+      {"internalType": "uint256", "name": "forVotes", "type": "uint256"},
+      {"internalType": "uint256", "name": "againstVotes", "type": "uint256"},
+      {"internalType": "uint256", "name": "startTime", "type": "uint256"},
+      {"internalType": "uint256", "name": "endTime", "type": "uint256"},
+      {"internalType": "bool", "name": "executed", "type": "bool"},
+      {"internalType": "bool", "name": "canceled", "type": "bool"},
+      {"internalType": "uint256", "name": "quorum", "type": "uint256"},
+      {"internalType": "uint256", "name": "minVotingPower", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "proposalId", "type": "uint256"}],
+    "name": "getProposalStatus",
+    "outputs": [
+      {"internalType": "bool", "name": "isActive", "type": "bool"},
+      {"internalType": "bool", "name": "isPassed", "type": "bool"},
+      {"internalType": "bool", "name": "isExecuted", "type": "bool"},
+      {"internalType": "bool", "name": "isCanceled", "type": "bool"},
+      {"internalType": "uint256", "name": "timeRemaining", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getActiveProposals",
+    "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"internalType": "address", "name": "user", "type": "address"}
+    ],
+    "name": "getUserVote",
+    "outputs": [
+      {"internalType": "bool", "name": "support", "type": "bool"},
+      {"internalType": "uint256", "name": "votingPower", "type": "uint256"},
+      {"internalType": "uint256", "name": "timestamp", "type": "uint256"},
+      {"internalType": "string", "name": "reason", "type": "string"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const
+
+interface Proposal {
+  id: number
+  proposer: string
+  title: string
+  description: string
+  forVotes: bigint
+  againstVotes: bigint
+  startTime: bigint
+  endTime: bigint
+  executed: boolean
+  canceled: boolean
+  quorum: bigint
+  minVotingPower: bigint
+  status?: string
+  timeRemaining?: string
+  userVote?: boolean | null
+}
 
 const GovernanceTab: React.FC = () => {
-  const { 
-    getRiskAssessment,
-    bridgeAssets,
-    isLoading 
-  } = useCoreYield()
+  const { address, isConnected } = useAccount()
+  
+  // Governance state
+  const [proposalTitle, setProposalTitle] = useState('')
+  const [proposalDescription, setProposalDescription] = useState('')
+  const [proposalDuration, setProposalDuration] = useState('7') // days
+  const [isCreatingProposal, setIsCreatingProposal] = useState(false)
+  const [proposals, setProposals] = useState<Proposal[]>([])
+  const [isLoadingProposals, setIsLoadingProposals] = useState(false)
+  const [votingProposal, setVotingProposal] = useState<number | null>(null)
 
-  const [riskProfile, setRiskProfile] = useState<any>(null)
-  const [governanceProposals, setGovernanceProposals] = useState<any[]>([])
-  const [userVotes, setUserVotes] = useState<any[]>([])
-  const [bridgeForm, setBridgeForm] = useState({
-    sourceChain: 1114, // Core Testnet
-    targetChain: 1, // Ethereum Mainnet
-    asset: 'CORE',
-    amount: '',
-    recipient: ''
+  // Get user's voting power from governance contract
+  const { data: userVotingPower } = useReadContract({
+    address: CONTRACTS.CORE_GOVERNANCE as `0x${string}`,
+    abi: CoreGovernanceABI,
+    functionName: 'userVotingPower',
+    args: [address as `0x${string}`],
+    query: { enabled: !!address }
   })
 
-  // Fetch risk assessment
-  const fetchRiskAssessment = async () => {
+  // Get active proposals
+  const { data: activeProposals, refetch: refetchActiveProposals } = useReadContract({
+    address: CONTRACTS.CORE_GOVERNANCE as `0x${string}`,
+    abi: CoreGovernanceABI,
+    functionName: 'getActiveProposals',
+    query: { enabled: !!address }
+  })
+
+  // Contract write functions
+  const { writeContract: writeGovernance } = useWriteContract()
+
+  // Fetch proposal details when activeProposals changes
+  useEffect(() => {
+    if (activeProposals && Array.isArray(activeProposals) && activeProposals.length > 0) {
+      fetchProposalDetails(activeProposals)
+    } else {
+      setProposals([])
+    }
+  }, [activeProposals])
+
+  const fetchProposalDetails = async (proposalIds: bigint[]) => {
+    setIsLoadingProposals(true)
     try {
-      const risk = await getRiskAssessment()
-      setRiskProfile(risk)
+      const proposalDetails: Proposal[] = []
+      
+      for (const proposalId of proposalIds) {
+        try {
+          const proposalInfo = await fetchProposalInfo(Number(proposalId))
+          const proposalStatus = await fetchProposalStatus(Number(proposalId))
+          const userVote = await fetchUserVote(Number(proposalId))
+          
+          proposalDetails.push({
+            ...proposalInfo,
+            status: proposalStatus.isActive ? 'Active' : proposalStatus.isPassed ? 'Passed' : 'Failed',
+            timeRemaining: formatTimeRemaining(proposalStatus.timeRemaining),
+            userVote: userVote.support
+          })
+        } catch (error) {
+          console.error(`Failed to fetch proposal ${proposalId}:`, error)
+        }
+      }
+      
+      setProposals(proposalDetails)
     } catch (error) {
-      console.error('Failed to fetch risk assessment:', error)
+      console.error('Failed to fetch proposal details:', error)
+    } finally {
+      setIsLoadingProposals(false)
     }
   }
 
-  useEffect(() => {
-    fetchRiskAssessment()
-  }, [])
+  const fetchProposalInfo = async (proposalId: number): Promise<Proposal> => {
+    // For now, return mock data since we need to implement proper contract calls
+    // TODO: Replace with actual contract calls to getProposalInfo
+    return {
+      id: proposalId,
+      proposer: '0x0000000000000000000000000000000000000000',
+      title: `Proposal #${proposalId}`,
+      description: 'Proposal description will be fetched from contract',
+      forVotes: 0n,
+      againstVotes: 0n,
+      startTime: 0n,
+      endTime: 0n,
+      executed: false,
+      canceled: false,
+      quorum: 0n,
+      minVotingPower: 0n
+    }
+  }
 
-  // Mock governance proposals (replace with real contract calls)
-  useEffect(() => {
-    setGovernanceProposals([
-      {
-        id: 1,
-        title: 'Increase Protocol Fee to 0.5%',
-        description: 'Proposal to increase the protocol fee from 0.3% to 0.5% to improve sustainability',
-        proposer: '0x1234...5678',
-        forVotes: 1500000,
-        againstVotes: 500000,
-        status: 'active',
-        endTime: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days from now
-        category: 'fee'
-      },
-      {
-        id: 2,
-        title: 'Add New Asset: USDC',
-        description: 'Proposal to add USDC as a supported asset for yield tokenization',
-        proposer: '0x8765...4321',
-        forVotes: 2000000,
-        againstVotes: 300000,
-        status: 'active',
-        endTime: Date.now() + 5 * 24 * 60 * 60 * 1000, // 5 days from now
-        category: 'asset'
-      },
-      {
-        id: 3,
-        title: 'Emergency Pause Protocol',
-        description: 'Emergency proposal to pause all protocol operations due to security concerns',
-        proposer: '0x9999...8888',
-        forVotes: 500000,
-        againstVotes: 2500000,
-        status: 'active',
-        endTime: Date.now() + 1 * 24 * 60 * 60 * 1000, // 1 day from now
-        category: 'emergency'
-      }
-    ])
-  }, [])
+  const fetchProposalStatus = async (proposalId: number) => {
+    // For now, return mock data since we need to implement proper contract calls
+    // TODO: Replace with actual contract calls to getProposalStatus
+    return {
+      isActive: true,
+      isPassed: false,
+      isExecuted: false,
+      isCanceled: false,
+      timeRemaining: BigInt(7 * 24 * 60 * 60) // 7 days in seconds
+    }
+  }
 
-  // Handle bridge assets
-  const handleBridgeAssets = async () => {
-    if (!bridgeForm.amount || !bridgeForm.recipient) {
-      alert('Please fill in all fields')
+  const fetchUserVote = async (proposalId: number) => {
+    if (!address) return { support: false, votingPower: 0n, timestamp: 0n, reason: '' }
+    // For now, return mock data since we need to implement proper contract calls
+    // TODO: Replace with actual contract calls to getUserVote
+    return { support: false, votingPower: 0n, timestamp: 0n, reason: '' }
+  }
+
+  const formatTimeRemaining = (seconds: bigint): string => {
+    const totalSeconds = Number(seconds)
+    if (totalSeconds <= 0) return 'Ended'
+    
+    const days = Math.floor(totalSeconds / (24 * 60 * 60))
+    const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60))
+    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60)
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+  }
+
+  const proposalDurations = [
+    { value: '1', label: '1 Day' },
+    { value: '3', label: '3 Days' },
+    { value: '7', label: '1 Week' },
+    { value: '14', label: '2 Weeks' },
+    { value: '30', label: '1 Month' }
+  ]
+
+  const handleCreateProposal = async () => {
+    if (!proposalTitle.trim() || !proposalDescription.trim()) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    if (!address) {
+      toast.error('Please connect your wallet')
       return
     }
 
     try {
-      await bridgeAssets(
-        bridgeForm.sourceChain,
-        bridgeForm.targetChain,
-        bridgeForm.asset,
-        bridgeForm.amount,
-        bridgeForm.recipient
-      )
+      setIsCreatingProposal(true)
       
-      // Reset form
-      setBridgeForm({
-        sourceChain: 1114,
-        targetChain: 1,
-        asset: 'CORE',
-        amount: '',
-        recipient: ''
+      writeGovernance({
+        address: CONTRACTS.CORE_GOVERNANCE as `0x${string}`,
+        abi: CoreGovernanceABI,
+        functionName: 'createProposal',
+        args: [
+          proposalTitle,
+          proposalDescription,
+          BigInt(parseInt(proposalDuration) * 24 * 60 * 60) // Convert days to seconds
+        ]
       })
+
+      toast.success('Proposal creation transaction submitted!')
+      setProposalTitle('')
+      setProposalDescription('')
+      setProposalDuration('7')
+      setIsCreatingProposal(false)
+      
+      // Refresh proposals after creation
+      setTimeout(() => refetchActiveProposals(), 3000)
+      
     } catch (error) {
-      console.error('Bridge failed:', error)
+      console.error('Proposal creation failed:', error)
+      toast.error('Failed to create proposal. Please try again.')
+      setIsCreatingProposal(false)
     }
   }
 
-  // Calculate proposal progress
-  const calculateProposalProgress = (proposal: any) => {
-    const totalVotes = proposal.forVotes + proposal.againstVotes
-    if (totalVotes === 0) return 0
-    return (proposal.forVotes / totalVotes) * 100
-  }
-
-  // Get time remaining
-  const getTimeRemaining = (endTime: number) => {
-    const now = Date.now()
-    const remaining = endTime - now
-    
-    if (remaining <= 0) return 'Ended'
-    
-    const days = Math.floor(remaining / (24 * 60 * 60 * 1000))
-    const hours = Math.floor((remaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
-    
-    if (days > 0) return `${days}d ${hours}h remaining`
-    return `${hours}h remaining`
-  }
-
-  // Get category color
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'fee': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'asset': return 'bg-green-500/20 text-green-400 border-green-500/30'
-      case 'emergency': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+  const handleVote = async (proposalId: number, support: boolean) => {
+    if (!address) {
+      toast.error('Please connect your wallet')
+      return
     }
+
+    try {
+      setVotingProposal(proposalId)
+      
+      writeGovernance({
+        address: CONTRACTS.CORE_GOVERNANCE as `0x${string}`,
+        abi: CoreGovernanceABI,
+        functionName: 'vote',
+        args: [BigInt(proposalId), support, 'Voted via CoreYield UI']
+      })
+
+      toast.success(`Vote ${support ? 'for' : 'against'} submitted!`)
+      
+      // Refresh proposals after voting
+      setTimeout(() => refetchActiveProposals(), 3000)
+      
+    } catch (error) {
+      console.error('Vote failed:', error)
+      toast.error('Failed to submit vote. Please try again.')
+    } finally {
+      setVotingProposal(null)
+    }
+  }
+
+  const formatVotingPower = (power: bigint | undefined) => {
+    if (!power) return '0'
+    return formatUnits(power, 18)
+  }
+
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Back Button */}
+      <button className="text-gray-400 hover:text-white mb-4 flex items-center transition-colors">
+        <span>←</span>
+        <span className="ml-2">Back</span>
+      </button>
+
       {/* Governance Overview */}
-      <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🏛️ Governance Overview</h3>
+      <div className="bg-gray-900/50 border border-blue-500/30 rounded-xl p-8 backdrop-blur-sm">
+        <h1 className="text-3xl font-bold text-white mb-6 text-center">CoreYield Governance</h1>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Active Proposals</div>
-            <div className="text-2xl font-bold text-white">
-              {governanceProposals.filter(p => p.status === 'active').length}
+        {/* User Voting Power */}
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6 mb-8">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-white mb-2">Your Voting Power</h2>
+            <div className="text-4xl font-bold text-blue-400 mb-2">
+              {formatVotingPower(userVotingPower)} veCORE
             </div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Total Votes Cast</div>
-            <div className="text-2xl font-bold text-blue-400">
-              {governanceProposals.reduce((sum, p) => sum + p.forVotes + p.againstVotes, 0).toLocaleString()}
-            </div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Your Voting Power</div>
-            <div className="text-2xl font-bold text-green-400">
-              0 CORE
-            </div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Participation Rate</div>
-            <div className="text-2xl font-bold text-purple-400">
-              0%
-            </div>
+            <p className="text-gray-400 text-sm">
+              {parseFloat(formatVotingPower(userVotingPower)) > 0 
+                ? 'You can participate in governance decisions'
+                : 'Lock CORE tokens to gain voting power (veCORE contract not yet deployed)'}
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Active Proposals */}
-      <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🗳️ Active Proposals</h3>
-        
-        <div className="space-y-4">
-          {governanceProposals.filter(p => p.status === 'active').map((proposal) => (
-            <div key={proposal.id} className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h4 className="font-medium text-white">{proposal.title}</h4>
-                    <span className={`px-2 py-1 rounded-full text-xs border ${getCategoryColor(proposal.category)}`}>
-                      {proposal.category}
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mb-2">{proposal.description}</p>
-                  <div className="text-xs text-gray-500">
-                    Proposed by {proposal.proposer} • {getTimeRemaining(proposal.endTime)}
-                  </div>
-                </div>
-                
-                <div className="text-right">
-                  <div className="text-sm text-gray-400">Progress</div>
-                  <div className="text-lg font-bold text-white">
-                    {calculateProposalProgress(proposal).toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-              
-              {/* Voting Progress Bar */}
-              <div className="mb-3">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>For: {proposal.forVotes.toLocaleString()}</span>
-                  <span>Against: {proposal.againstVotes.toLocaleString()}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${calculateProposalProgress(proposal)}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              {/* Voting Buttons */}
-              <div className="flex space-x-3">
-                <button className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                  ✅ Vote For
-                </button>
-                <button className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                  ❌ Vote Against
-                </button>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                  📊 View Details
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Risk Management Panel */}
-      <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">⚠️ Risk Management</h3>
-        
-        {riskProfile ? (
+        {/* Create Proposal Section */}
+        <div className="bg-gray-800/50 border border-gray-600/30 rounded-lg p-6 mb-8">
+          <h3 className="text-lg font-semibold text-white mb-4">Create New Proposal</h3>
+          
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-sm text-gray-400">Portfolio Risk</div>
-                <div className="text-xl font-bold text-white">
-                  {riskProfile.riskScore || '0'}/10
-                </div>
-              </div>
-              
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-sm text-gray-400">Volatility</div>
-                <div className="text-xl font-bold text-orange-400">
-                  {riskProfile.volatility || '0'}%
-                </div>
-              </div>
-              
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <div className="text-sm text-gray-400">Max Drawdown</div>
-                <div className="text-xl font-bold text-red-400">
-                  {riskProfile.maxDrawdown || '0'}%
-                </div>
-              </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Proposal Title</label>
+              <input
+                type="text"
+                value={proposalTitle}
+                onChange={(e) => setProposalTitle(e.target.value)}
+                placeholder="Enter proposal title..."
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                disabled={isCreatingProposal}
+              />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                🚨 Emergency Exit
-              </button>
-              <button className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                📊 Risk Report
-              </button>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-                ⚙️ Adjust Strategy
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <div className="text-gray-400">Risk assessment data not available</div>
-          </div>
-        )}
-      </div>
-
-      {/* Cross-Chain Bridge */}
-      <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🌉 Cross-Chain Bridge</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Source Chain</label>
-              <select 
-                value={bridgeForm.sourceChain}
-                onChange={(e) => setBridgeForm(prev => ({ ...prev, sourceChain: parseInt(e.target.value) }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              >
-                <option value={1114}>Core Testnet</option>
-                <option value={1}>Ethereum Mainnet</option>
-                <option value={137}>Polygon</option>
-                <option value={56}>BSC</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Target Chain</label>
-              <select 
-                value={bridgeForm.targetChain}
-                onChange={(e) => setBridgeForm(prev => ({ ...prev, targetChain: parseInt(e.target.value) }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              >
-                <option value={1}>Ethereum Mainnet</option>
-                <option value={1114}>Core Testnet</option>
-                <option value={137}>Polygon</option>
-                <option value={56}>BSC</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Asset</label>
-              <select 
-                value={bridgeForm.asset}
-                onChange={(e) => setBridgeForm(prev => ({ ...prev, asset: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              >
-                <option value="CORE">CORE</option>
-                <option value="stCORE">stCORE</option>
-                <option value="USDC">USDC</option>
-                <option value="ETH">ETH</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Amount</label>
-              <input 
-                type="number"
-                value={bridgeForm.amount}
-                onChange={(e) => setBridgeForm(prev => ({ ...prev, amount: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                placeholder="0.0"
-                step="0.1"
+              <label className="block text-sm text-gray-300 mb-2">Description</label>
+              <textarea
+                value={proposalDescription}
+                onChange={(e) => setProposalDescription(e.target.value)}
+                placeholder="Describe your proposal in detail..."
+                rows={4}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none resize-none"
+                disabled={isCreatingProposal}
               />
             </div>
-
+            
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Recipient Address</label>
-              <input 
-                type="text"
-                value={bridgeForm.recipient}
-                onChange={(e) => setBridgeForm(prev => ({ ...prev, recipient: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                placeholder="0x..."
-              />
+              <label className="block text-sm text-gray-300 mb-2">Duration</label>
+              <select
+                value={proposalDuration}
+                onChange={(e) => setProposalDuration(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                disabled={isCreatingProposal}
+              >
+                {proposalDurations.map((duration) => (
+                  <option key={duration.value} value={duration.value}>
+                    {duration.label}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <button 
-              onClick={handleBridgeAssets}
-              disabled={isLoading || !bridgeForm.amount || !bridgeForm.recipient}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            
+            <button
+              onClick={handleCreateProposal}
+              disabled={!proposalTitle.trim() || !proposalDescription.trim() || isCreatingProposal}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isLoading ? 'Bridging...' : '🌉 Bridge Assets'}
+              {isCreatingProposal ? 'Creating Proposal...' : 'Create Proposal'}
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Governance History */}
-      <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">📜 Governance History</h3>
-        
-        <div className="space-y-4">
-          {governanceProposals.filter(p => p.status !== 'active').map((proposal) => (
-            <div key={proposal.id} className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-white">{proposal.title}</h4>
-                  <div className="text-sm text-gray-400">
-                    {proposal.status === 'passed' ? '✅ Passed' : '❌ Failed'} • 
-                    Ended {new Date(proposal.endTime).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-400">Final Result</div>
-                  <div className={`font-medium ${proposal.status === 'passed' ? 'text-green-400' : 'text-red-400'}`}>
-                    {calculateProposalProgress(proposal).toFixed(1)}% For
-                  </div>
-                </div>
-              </div>
+        {/* Active Proposals */}
+        <div className="bg-gray-800/50 border border-gray-600/30 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Active Proposals</h3>
+            <button
+              onClick={() => refetchActiveProposals()}
+              disabled={isLoadingProposals}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {isLoadingProposals ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+          
+          {isLoadingProposals ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">⏳</div>
+              <p className="text-gray-400">Loading proposals...</p>
             </div>
-          ))}
+          ) : proposals.length > 0 ? (
+            <div className="space-y-4">
+              {proposals.map((proposal) => (
+                <div key={proposal.id} className="bg-gray-700/50 border border-gray-600/30 rounded-lg p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-white">{proposal.title}</h4>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        proposal.status === 'Active' ? 'bg-green-500/20 text-green-400' :
+                        proposal.status === 'Passed' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {proposal.status}
+                      </span>
+                    </div>
+                    
+                    <p className="text-gray-300 text-sm">{proposal.description}</p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Proposer:</span>
+                        <p className="text-white font-mono">{formatAddress(proposal.proposer)}</p>
+                      </div>
+                                               <div>
+                           <span className="text-gray-400">For Votes:</span>
+                           <p className="text-green-400 font-medium">{formatVotingPower(proposal.forVotes as bigint)}</p>
+                         </div>
+                         <div>
+                           <span className="text-gray-400">Against Votes:</span>
+                           <p className="text-red-400 font-medium">{formatVotingPower(proposal.againstVotes as bigint)}</p>
+                         </div>
+                      <div>
+                        <span className="text-gray-400">Time Remaining:</span>
+                        <p className="text-white font-medium">{proposal.timeRemaining}</p>
+                      </div>
+                    </div>
+                    
+                    {proposal.status === 'Active' && (
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-600/30">
+                        <div className="text-sm text-gray-400">
+                          {proposal.userVote !== null ? (
+                            <span className={`${proposal.userVote ? 'text-green-400' : 'text-red-400'}`}>
+                              You voted {proposal.userVote ? 'FOR' : 'AGAINST'} this proposal
+                            </span>
+                          ) : (
+                            'You haven\'t voted yet'
+                          )}
+                        </div>
+                        
+                        {proposal.userVote === null && (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleVote(proposal.id, true)}
+                              disabled={votingProposal === proposal.id}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                            >
+                              {votingProposal === proposal.id ? 'Voting...' : 'Vote For'}
+                            </button>
+                            <button
+                              onClick={() => handleVote(proposal.id, false)}
+                              disabled={votingProposal === proposal.id}
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                              {votingProposal === proposal.id ? 'Voting...' : 'Vote Against'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">📋</div>
+              <h4 className="text-lg font-medium text-white mb-2">No Active Proposals</h4>
+              <p className="text-gray-400">Be the first to create a proposal!</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

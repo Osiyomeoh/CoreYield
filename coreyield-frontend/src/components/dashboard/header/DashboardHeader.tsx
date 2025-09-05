@@ -26,12 +26,14 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   setShowUSD,
   globalStats
 }) => {
-  const navigationItems = [
+  const navigation = [
+    { id: 'education', label: 'Education', icon: 'BookOpenIcon' },
     { id: 'markets', label: 'Markets', icon: 'ChartBarIcon' },
-    { id: 'trade', label: 'Trade', icon: 'CurrencyDollarIcon' },
-    { id: 'portfolio', label: 'Portfolio', icon: 'BriefcaseIcon' },
-    { id: 'pools', label: 'Pools', icon: 'SwimmingPoolIcon' }
-  ] as const
+    { id: 'pools', label: 'Pools', icon: 'CubeIcon' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'HomeIcon' },
+    { id: 'vecore', label: 'veCORE', icon: 'LockClosedIcon' },
+    { id: 'pendleswap', label: 'PendleSwap', icon: 'ArrowsRightLeftIcon' },
+  ]
 
   return (
     <div className="bg-gray-900/95 backdrop-blur-md border-b border-gray-800/50 sticky top-0 z-50 w-full">
@@ -56,7 +58,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             {[
               { id: 'markets', label: 'Markets', icon: 'ChartBarIcon' },
               { id: 'pools', label: 'Pools', icon: 'SwimmingPoolIcon' },
-              { id: 'points', label: 'Points Markets', icon: 'TargetIcon' },
               { id: 'dashboard', label: 'Dashboard', icon: 'TrendingUpIcon' },
               { id: 'vecore', label: 'veCORE', icon: 'LockClosedIcon' }
             ].map((item) => (

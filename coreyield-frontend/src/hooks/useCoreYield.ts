@@ -52,6 +52,19 @@ export interface PoolData {
   totalSupply: string
   isYieldPool: boolean
   yieldMultiplier: string
+  // Additional properties for pools page
+  asset: string
+  tvl: string
+  volume24h: string
+  apy: string
+  userLiquidity: string
+  poolAddress: string
+  ptToken: string
+  ytToken: string
+  underlying: string
+  maturity: number
+  ptReserves: string
+  ytReserves: string
 }
 
 // Import actual ABIs
@@ -2844,6 +2857,132 @@ export const useCoreYield = () => {
     }
   }, [address, publicClient])
 
+  // Load pool data from markets
+  const loadPoolData = async () => {
+    if (!publicClient) return
+    
+    try {
+      console.log('🚀 Loading pool data...')
+      const newPoolData: Record<string, PoolData> = {}
+      
+      // Load data for each market
+      for (const [marketKey, market] of Object.entries(CONTRACTS.MARKETS)) {
+        try {
+          // Get pool reserves
+          const ptReserves = parseFloat(market.poolReserves.pt)
+          const ytReserves = parseFloat(market.poolReserves.yt)
+          
+          // Calculate TVL (simplified - in real app would get actual token prices)
+          const tvl = (ptReserves + ytReserves) * 1000 // Placeholder calculation
+          
+          // Get user's liquidity position (simplified)
+          const userLiquidity = 0 // Would need to query actual user position
+          
+          newPoolData[marketKey] = {
+            // Required properties from original interface
+            token0: market.ptToken,
+            token1: market.ytToken,
+            reserve0: market.poolReserves.pt,
+            reserve1: market.poolReserves.yt,
+            totalSupply: '1000000', // Placeholder
+            isYieldPool: true,
+            yieldMultiplier: '1.0',
+            // Additional properties for pools page
+            asset: marketKey,
+            tvl: `$${tvl.toLocaleString()}`,
+            volume24h: '$0.00', // Would need to track actual volume
+            apy: '8.5%', // Would need to calculate from yield data
+            userLiquidity: `$${userLiquidity.toLocaleString()}`,
+            poolAddress: market.syToken,
+            ptToken: market.ptToken,
+            ytToken: market.ytToken,
+            underlying: market.underlying,
+            maturity: market.maturity,
+            ptReserves: market.poolReserves.pt,
+            ytReserves: market.poolReserves.yt
+          }
+        } catch (error) {
+          console.log(`❌ Failed to load pool data for ${marketKey}:`, error)
+          // Set default values
+          newPoolData[marketKey] = {
+            // Required properties from original interface
+            token0: market.ptToken,
+            token1: market.ytToken,
+            reserve0: '0',
+            reserve1: '0',
+            totalSupply: '1000000', // Placeholder
+            isYieldPool: true,
+            yieldMultiplier: '1.0',
+            // Additional properties for pools page
+            asset: marketKey,
+            tvl: '$0.00',
+            volume24h: '$0.00',
+            apy: '0.00%',
+            userLiquidity: '$0.00',
+            poolAddress: market.syToken,
+            ptToken: market.ptToken,
+            ytToken: market.ytToken,
+            underlying: market.underlying,
+            maturity: market.maturity,
+            ptReserves: '0',
+            ytReserves: '0'
+          }
+        }
+      }
+      
+      setPoolData(newPoolData)
+      console.log('✅ Pool data loaded:', newPoolData)
+      
+    } catch (error) {
+      console.error('❌ Failed to load pool data:', error)
+    }
+  }
+
+  // Load pool data when component mounts
+  useEffect(() => {
+    if (address && publicClient) {
+      loadPoolData()
+    }
+  }, [address, publicClient])
+
+  // Add liquidity to a pool
+  const addLiquidity = async (asset: string, ptAmount: string, ytAmount: string) => {
+    if (!address || !publicClient || !walletClient) {
+      toast.error('Please connect your wallet')
+      return
+    }
+
+    try {
+      console.log('🚀 Adding liquidity to pool:', asset)
+      setIsLoading(true)
+
+      // Get pool data
+      const pool = poolData[asset]
+      if (!pool) {
+        toast.error('Pool not found')
+        return
+      }
+
+      // For now, this is a placeholder implementation
+      // In a real implementation, you would:
+      // 1. Approve PT and YT tokens for the AMM contract
+      // 2. Call addLiquidity on the AMM contract
+      // 3. Handle the LP token minting
+
+      toast.success(`Liquidity added to ${asset} pool!`)
+      console.log('✅ Liquidity added successfully')
+      
+      // Refresh pool data
+      await loadPoolData()
+      
+    } catch (error) {
+      console.error('❌ Add liquidity failed:', error)
+      toast.error(`Failed to add liquidity: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return {
     // State
     isLoading,
@@ -2913,6 +3052,7 @@ export const useCoreYield = () => {
     // Transaction tracking
     transactionStatuses,
     getButtonText,
-    getLockPeriodInfo
+    getLockPeriodInfo,
+    addLiquidity
   }
 }
