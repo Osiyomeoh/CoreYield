@@ -9,15 +9,15 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/logo2.svg",
+      "src": "/logo2.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon2.svg",
+      "src": "/logo2.png",
       "sizes": "32x32",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ],
   "categories": ["finance", "productivity"],

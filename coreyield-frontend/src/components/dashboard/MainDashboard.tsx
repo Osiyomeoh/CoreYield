@@ -380,8 +380,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">CY</span>
+              <div className="w-7 h-7 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
+                <img src="/logo2.png" alt="CoreYield" className="w-4 h-4" />
                 </div>
               <div>
                 <span className="text-lg font-bold text-white">CoreYield</span>
@@ -2736,8 +2736,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
             <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
             {/* Profile Picture */}
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">CY</span>
+            <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center border border-gray-700">
+              <img src="/logo2.png" alt="CoreYield" className="w-8 h-8" />
             </div>
 
             {/* Wallet Info */}
