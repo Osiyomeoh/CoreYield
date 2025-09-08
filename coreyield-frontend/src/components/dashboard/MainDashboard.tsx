@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useCoreYield } from '../../hooks/useCoreYield'
 import { useTransactionHistory } from '../../hooks/useTransactionHistory'
 import { useNotifications } from '../../hooks/useNotifications'
-import { useReadContract } from 'wagmi'
+import { useReadContract, useAccount } from 'wagmi'
 import { CustomConnectButton } from './shared/CustomConnectButton'
 import { CONTRACTS, ASSET_METADATA } from '../../../contracts/addresses'
 import { formatUnits } from 'viem'
@@ -42,6 +42,7 @@ import { AmountInput } from './shared/AmountInput'
 import { ProcessingStatus } from './shared/ProcessingStatus'
 import { ChainSelector } from './shared/ChainSelector'
 import { FilterControls } from './shared/FilterControls'
+import { TokenRequestModal } from './shared/TokenRequestModal'
 
 // Chart Component
 import { ChartComponent } from './ChartComponent'
@@ -94,6 +95,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   
   // Transaction History State
   const [showTransactionHistory, setShowTransactionHistory] = useState(false)
+  
+  // Token Request Modal State
+  const [showTokenRequestModal, setShowTokenRequestModal] = useState(false)
   
   // Tools Input State
   const [wrapAmount, setWrapAmount] = useState('')
@@ -155,6 +159,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
   const coreYield = useCoreYield()
   const { transactions } = useTransactionHistory()
   const { notifications, removeNotification } = useNotifications()
+  const { address } = useAccount()
 
   // Get real protocol stats from contracts
   const { data: protocolStats } = useReadContract({
@@ -1897,11 +1902,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                         // Show data for the currently selected market
                         if (currentView === 'trading' && tradingView.asset) {
                           const marketName = tradingView.asset;
-                          if (marketName.startsWith('lstBTC')) {
-                            return parseFloat(coreYield.userBalances?.lstBTC?.pt || '0').toFixed(2);
-                          } else if (marketName.startsWith('stCORE')) {
-                            return parseFloat(coreYield.userBalances?.stCORE?.pt || '0').toFixed(2);
-                          }
+                          console.log('🔍 Displaying balance for specific market:', marketName);
+                          console.log('🔍 Available userBalances keys:', Object.keys(coreYield.userBalances || {}));
+                          
+                          // Show balance for the specific market (e.g., stCORE_1, lstBTC_0)
+                          const specificBalance = coreYield.userBalances?.[marketName]?.pt || '0';
+                          console.log('🔍 Specific market balance for', marketName, ':', specificBalance);
+                          console.log('🔍 Available userBalances keys:', Object.keys(coreYield.userBalances || {}));
+                          console.log('🔍 Full userBalances object:', coreYield.userBalances);
+                          return parseFloat(specificBalance).toFixed(2);
                         }
                         // Default to stCORE
                         return parseFloat(coreYield.userBalances?.stCORE?.pt || '0').toFixed(2);
@@ -1927,11 +1936,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                         // Show data for the currently selected market
                         if (currentView === 'trading' && tradingView.asset) {
                           const marketName = tradingView.asset;
-                          if (marketName.startsWith('lstBTC')) {
-                            return parseFloat(coreYield.userBalances?.lstBTC?.yt || '0').toFixed(2);
-                          } else if (marketName.startsWith('stCORE')) {
-                            return parseFloat(coreYield.userBalances?.stCORE?.yt || '0').toFixed(2);
-                          }
+                          console.log('🔍 Displaying YT balance for specific market:', marketName);
+                          
+                          // Show balance for the specific market (e.g., stCORE_1, lstBTC_0)
+                          const specificBalance = coreYield.userBalances?.[marketName]?.yt || '0';
+                          console.log('🔍 Specific market YT balance for', marketName, ':', specificBalance);
+                          return parseFloat(specificBalance).toFixed(2);
                         }
                         // Default to stCORE
                         return parseFloat(coreYield.userBalances?.stCORE?.yt || '0').toFixed(2);
@@ -2420,7 +2430,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                   <div className="bg-gray-700/50 rounded-xl p-2 border border-gray-600/30">
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-gray-300 text-xs font-medium">Mint Test Tokens</label>
-                      <div className="text-gray-400 text-xs">Asset: {selectedAsset}</div>
+                      <div className="text-gray-400 text-xs">Asset: CORE (dualCORE)</div>
                   </div>
                     <input
                       type="number"
@@ -2430,15 +2440,23 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                       className="w-full bg-transparent text-white text-sm font-medium outline-none"
                     />
                     <div className="text-gray-400 text-xs mt-0.5">
-                      Mint {mintAmount || '0'} {selectedAsset} tokens for testing
+                      {address?.toLowerCase() === '0xce09931eebd7d57c10bdce6dbfa51a1139ec3663' 
+                        ? `Mint ${mintAmount || '0'} CORE tokens directly (Owner)`
+                        : `Mint ${mintAmount || '0'} CORE tokens for testing`
+                      }
                     </div>
                   </div>
                   <button 
-                    onClick={() => coreYield.mintTokens(selectedAsset as 'dualCORE' | 'stCORE' | 'lstBTC', mintAmount)}
+                    onClick={() => coreYield.mintTokens('dualCORE', mintAmount)}
                     disabled={!mintAmount || parseFloat(mintAmount) <= 0 || coreYield.transactionStatuses.mint === 'pending'}
                     className="w-full py-2 px-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm"
                   >
-                    {coreYield.transactionStatuses.mint === 'pending' ? 'Processing...' : 'Mint Tokens'}
+                    {coreYield.transactionStatuses.mint === 'pending' 
+                      ? 'Processing...' 
+                      : address?.toLowerCase() === '0xce09931eebd7d57c10bdce6dbfa51a1139ec3663'
+                        ? 'Mint CORE Tokens (Owner)'
+                        : 'Mint CORE Tokens'
+                    }
                   </button>
                 </div>
               )}
@@ -2487,9 +2505,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                       <div className="text-gray-400 text-xs">
                         Balance: {(() => {
                           if (swapDirection === 'pt-to-yt') {
-                            return coreYield.userBalances[selectedAsset]?.pt || '0'
+                            return coreYield.userBalances[asset]?.pt || '0'
                           } else {
-                            return coreYield.userBalances[selectedAsset]?.yt || '0'
+                            return coreYield.userBalances[asset]?.yt || '0'
                           }
                         })()}
                       </div>
@@ -2506,8 +2524,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                       <button 
                         onClick={() => {
                           const balance = swapDirection === 'pt-to-yt' 
-                            ? coreYield.userBalances[selectedAsset]?.pt || '0'
-                            : coreYield.userBalances[selectedAsset]?.yt || '0'
+                            ? coreYield.userBalances[asset]?.pt || '0'
+                            : coreYield.userBalances[asset]?.yt || '0'
                           setSwapAmount(balance)
                         }}
                         className="px-2 py-1 bg-gray-600 text-white text-xs rounded-lg hover:bg-gray-500 transition-all duration-200"
@@ -2543,9 +2561,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                       <div className="text-gray-400 text-xs">
                         Balance: {(() => {
                           if (swapDirection === 'pt-to-yt') {
-                            return coreYield.userBalances[selectedAsset]?.yt || '0'
+                            return coreYield.userBalances[asset]?.yt || '0'
                           } else {
-                            return coreYield.userBalances[selectedAsset]?.pt || '0'
+                            return coreYield.userBalances[asset]?.pt || '0'
                           }
                         })()}
                       </div>
@@ -2565,9 +2583,49 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
                     </div>
                   </div>
 
+                  {/* Refresh Button */}
+                  <button 
+                    onClick={async () => {
+                      console.log('🔄 Refresh button clicked!')
+                      console.log('🔍 Current balances before refresh:', coreYield.userBalances)
+                      
+                      // Force refresh of all balances
+                      try {
+                        console.log('🔄 Force refreshing all balances...')
+                        
+                        // Refresh token balances first
+                        await coreYield.refreshTokenBalances()
+                        await coreYield.refreshBalances()
+                        
+                        console.log('✅ All balances refreshed!')
+                      } catch (error) {
+                        console.error('❌ Error refreshing balances:', error)
+                      }
+                      
+                      // Wait a moment for state to update
+                      setTimeout(() => {
+                        console.log('🔍 Current balances after refresh (delayed):', coreYield.userBalances)
+                      }, 1000)
+                    }}
+                    className="w-full py-1 px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 text-xs mb-2"
+                  >
+                    🔄 Refresh Balances
+                  </button>
+
+                  {/* Request Test Tokens Button */}
+                  <button 
+                    onClick={() => setShowTokenRequestModal(true)}
+                    className="w-full py-1 px-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-all duration-200 text-xs mb-2"
+                  >
+                    🪙 Request Test Tokens
+                  </button>
+
                   {/* Swap Button */}
                   <button 
-                    onClick={() => coreYield.swapPTYT(selectedAsset, swapAmount, swapDirection)}
+                    onClick={() => {
+                      console.log('🔄 Swap button clicked with:', { asset, swapAmount, swapDirection })
+                      coreYield.swapPTYT(asset, swapAmount, swapDirection)
+                    }}
                     disabled={!swapAmount || parseFloat(swapAmount) <= 0 || coreYield.transactionStatuses.swap === 'pending'}
                     className="w-full py-2 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 text-sm shadow-lg shadow-green-600/25 hover:shadow-green-600/40"
                   >
@@ -3370,6 +3428,17 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({ onShowEducation })
           </div>
         </div>
       )}
+
+      {/* Token Request Modal */}
+      <TokenRequestModal
+        isOpen={showTokenRequestModal}
+        onClose={() => setShowTokenRequestModal(false)}
+        userAddress={address || ''}
+        onRequestTokens={(amount) => {
+          coreYield.requestTestTokens(amount)
+          setShowTokenRequestModal(false)
+        }}
+      />
     </div>
   )
 }

@@ -38,7 +38,7 @@ const config: HardhatUserConfig = {
     coreTestnet: {
       url: "https://rpc.test2.btcs.network",
       chainId: 1114,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+      accounts: process.env.PRIVATE_KEY_1 ? [process.env.PRIVATE_KEY_1] : []
     },
     coreMainnet: {
       url: "https://rpc.coredao.org",

@@ -11,6 +11,7 @@ import {
 import { parseEther, formatUnits, encodeFunctionData, type Address } from 'viem'
 import toast from 'react-hot-toast'
 import { CONTRACTS } from '@contracts/addresses'
+import CoreYieldAMMABI from '../abis/CoreYieldAMM.json'
 
 // Add missing interfaces
 export interface MarketData {
@@ -469,6 +470,14 @@ export const useCoreYield = () => {
 
   // CONSOLIDATED: Load both basic balances AND token balances in one useEffect to prevent conflicts
   useEffect(() => {
+    console.log('🔍 useEffect triggered with:', {
+      address: !!address,
+      coreBalance: !!coreBalance,
+      stCoreBalance: !!stCoreBalance,
+      lstBTCBalance: !!lstBTCBalance,
+      publicClient: !!publicClient
+    })
+    
     if (address && coreBalance && stCoreBalance && lstBTCBalance && publicClient) {
       console.log('🚀 Loading ALL balances (basic + token) in one consolidated useEffect...')
       setIsLoadingBalances(true)
@@ -590,26 +599,54 @@ export const useCoreYield = () => {
           // Wait for all balance reads to complete
           const balanceResults = await Promise.all(balancePromises)
           
-          // Aggregate the results
-          balanceResults.forEach(result => {
+          // Create individual market balances AND aggregate them
+          const individualMarketBalances: Record<string, TokenBalances> = {}
+          
+          balanceResults.forEach((result, index) => {
             if (result) {
               const { assetType, sy, pt, yt } = result
+              const marketKey = Object.keys(CONTRACTS.MARKETS)[index]
+              
+              // Store individual market balance
+              individualMarketBalances[marketKey] = {
+                underlying: '0',
+                sy: sy.toFixed(2),
+                pt: pt.toFixed(2),
+                yt: yt.toFixed(2),
+                claimableYield: '0'
+              }
+              
+              // Aggregate into main asset types
               updatedBalances[assetType].sy = (parseFloat(updatedBalances[assetType].sy) + sy).toFixed(2)
               updatedBalances[assetType].pt = (parseFloat(updatedBalances[assetType].pt) + pt).toFixed(2)
               updatedBalances[assetType].yt = (parseFloat(updatedBalances[assetType].yt) + yt).toFixed(2)
             }
           })
           
+          // Combine individual market balances + aggregated balances
+          const finalBalances = {
+            ...updatedBalances,           // Aggregated balances (stCORE, lstBTC, dualCORE)
+            ...individualMarketBalances  // Individual market balances (stCORE_0, stCORE_1, etc.)
+          }
+          
+          console.log('🔄 Individual market balances created:', individualMarketBalances)
+          console.log('🔄 Aggregated balances:', updatedBalances)
+          console.log('🔄 Final balances to set:', finalBalances)
+          
           // Set all balances at once for better UX
-          setUserBalances(updatedBalances)
+          setUserBalances(finalBalances)
           setIsLoadingBalances(false)
           setBalancesLoaded(true)
           
           console.log('✅ All balances loaded, setting state once...')
-          console.log('🔄 Final userBalances after consolidation:', updatedBalances)
+          console.log('🔄 Final userBalances after consolidation:', finalBalances)
+          console.log('🔄 isLoadingBalances set to false')
+          console.log('🔄 balancesLoaded set to true')
           
         } catch (error) {
           console.error('❌ Failed to load all balances:', error)
+          console.error('❌ Error details:', error.message)
+          console.error('❌ Error stack:', error.stack)
           setIsLoadingBalances(false)
           setBalancesLoaded(false)
         }
@@ -1286,10 +1323,15 @@ export const useCoreYield = () => {
 
   // Refresh token balances (SY, PT, YT)
   const refreshTokenBalances = async () => {
-    if (!address || !publicClient) return
+    if (!address || !publicClient) {
+      console.log('❌ Cannot refresh: missing address or publicClient')
+      return
+    }
     
     try {
       console.log('🔄 Manually refreshing token balances...')
+      console.log('🔍 Address:', address)
+      console.log('🔍 PublicClient available:', !!publicClient)
       
       // Reset any loading flags if needed
       
@@ -1452,11 +1494,52 @@ export const useCoreYield = () => {
       }
       
       console.log('🔍 Updated balances before setState:', updatedBalances)
-      setUserBalances(prev => {
-        const newBalances = { ...prev, ...updatedBalances }
-        console.log('🔄 Final userBalances after refresh:', newBalances)
-        return newBalances
+      
+      // Aggregate individual market balances into main asset types
+      const aggregatedBalances: Record<string, TokenBalances> = {
+        stCORE: { underlying: '0', sy: '0', pt: '0', yt: '0', claimableYield: '0' },
+        lstBTC: { underlying: '0', sy: '0', pt: '0', yt: '0', claimableYield: '0' },
+        dualCORE: { underlying: '0', sy: '0', pt: '0', yt: '0', claimableYield: '0' }
+      }
+      
+      // Aggregate stCORE markets
+      Object.keys(updatedBalances).forEach(key => {
+        if (key.startsWith('stCORE_')) {
+          const balance = updatedBalances[key]
+          aggregatedBalances.stCORE.sy = (parseFloat(aggregatedBalances.stCORE.sy) + parseFloat(balance.sy)).toFixed(2)
+          aggregatedBalances.stCORE.pt = (parseFloat(aggregatedBalances.stCORE.pt) + parseFloat(balance.pt)).toFixed(2)
+          aggregatedBalances.stCORE.yt = (parseFloat(aggregatedBalances.stCORE.yt) + parseFloat(balance.yt)).toFixed(2)
+          aggregatedBalances.stCORE.claimableYield = (parseFloat(aggregatedBalances.stCORE.claimableYield) + parseFloat(balance.claimableYield)).toFixed(2)
+        } else if (key.startsWith('lstBTC_')) {
+          const balance = updatedBalances[key]
+          aggregatedBalances.lstBTC.sy = (parseFloat(aggregatedBalances.lstBTC.sy) + parseFloat(balance.sy)).toFixed(2)
+          aggregatedBalances.lstBTC.pt = (parseFloat(aggregatedBalances.lstBTC.pt) + parseFloat(balance.pt)).toFixed(2)
+          aggregatedBalances.lstBTC.yt = (parseFloat(aggregatedBalances.lstBTC.yt) + parseFloat(balance.yt)).toFixed(2)
+          aggregatedBalances.lstBTC.claimableYield = (parseFloat(aggregatedBalances.lstBTC.claimableYield) + parseFloat(balance.claimableYield)).toFixed(2)
+        } else if (key.startsWith('dualCORE_')) {
+          const balance = updatedBalances[key]
+          aggregatedBalances.dualCORE.sy = (parseFloat(aggregatedBalances.dualCORE.sy) + parseFloat(balance.sy)).toFixed(2)
+          aggregatedBalances.dualCORE.pt = (parseFloat(aggregatedBalances.dualCORE.pt) + parseFloat(balance.pt)).toFixed(2)
+          aggregatedBalances.dualCORE.yt = (parseFloat(aggregatedBalances.dualCORE.yt) + parseFloat(balance.yt)).toFixed(2)
+          aggregatedBalances.dualCORE.claimableYield = (parseFloat(aggregatedBalances.dualCORE.claimableYield) + parseFloat(balance.claimableYield)).toFixed(2)
+        }
       })
+      
+      // Merge with existing balances to preserve other data
+      // Include both individual market balances AND aggregated balances
+      const finalBalances = { 
+        ...userBalances, 
+        ...updatedBalances,  // Individual market balances (stCORE_0, stCORE_1, etc.)
+        ...aggregatedBalances  // Aggregated balances (stCORE, lstBTC, etc.)
+      }
+      
+      console.log('🔄 Individual market balances:', updatedBalances)
+      console.log('🔄 Aggregated balances:', aggregatedBalances)
+      console.log('🔄 Final balances after merge:', finalBalances)
+      
+      // Force a complete state update to trigger re-render
+      setUserBalances(finalBalances)
+      
       console.log('✅ Token balances refreshed and state updated')
       
     } catch (error) {
@@ -1464,40 +1547,87 @@ export const useCoreYield = () => {
     }
   }
 
-  // Mint test tokens function
+  // Mint test tokens function (works directly if owner, shows instructions if not)
   const mintTokens = async (asset: 'dualCORE' | 'stCORE' | 'lstBTC', amount: string) => {
     if (!address) {
       toast.error('Please connect your wallet')
       return
     }
 
-    try {
-      setIsLoading(true)
-      const tokenAddress = CONTRACTS.MOCK_ASSETS[asset]
-      
-      // Call mint function on the token contract
-      await writeStaking({
-        address: tokenAddress as Address,
-        abi: [
-          {
-            name: 'mint',
-            type: 'function',
-            stateMutability: 'nonpayable',
-            inputs: [
-              { name: 'to', type: 'address' },
-              { name: 'amount', type: 'uint256' },
-            ],
-            outputs: [{ name: '', type: 'bool' }]
-          }
-        ] as any,
-        functionName: 'mint',
-        args: [address, parseEther(amount)]
-      })
+    // Check if the connected wallet is the owner
+    const ownerAddress = '0xCE09931EeBd7d57c10BDcE6dBfA51a1139ec3663'
+    const isOwner = address.toLowerCase() === ownerAddress.toLowerCase()
 
-      toast.success(`Successfully minted ${amount} ${asset} tokens`)
-      refreshAll()
+    try {
+      if (isOwner) {
+        // Owner can mint directly
+        console.log(`🪙 Owner minting ${amount} ${asset} tokens directly...`)
+        setIsLoading(true)
+        
+        const tokenAddress = CONTRACTS.MOCK_ASSETS[asset]
+        
+        // Call mint function on the token contract
+        await writeStaking({
+          address: tokenAddress as Address,
+          abi: [
+            {
+              name: 'mint',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'to', type: 'address' },
+                { name: 'amount', type: 'uint256' },
+              ],
+              outputs: [{ name: '', type: 'bool' }]
+            }
+          ] as any,
+          functionName: 'mint',
+          args: [address, parseEther(amount)]
+        })
+
+        toast.success(`Successfully minted ${amount} ${asset} tokens!`)
+        await refreshBalances()
+        
+      } else {
+        // Non-owner gets instructions
+        console.log(`🪙 Requesting ${amount} ${asset} test tokens for ${address}...`)
+        
+        const instructions = `
+🪙 TOKEN MINTING INSTRUCTIONS
+
+To mint ${amount} ${asset} tokens, run this command in your terminal:
+
+npx hardhat run scripts/mint-all-tokens.js --network coreTestnet ${address} ${amount}
+
+This will mint ${amount} CORE tokens to your address: ${address}
+
+After running the command:
+1. Click "🔄 Refresh Balances" button to see your new tokens
+2. Your balances should update automatically
+3. You can now use the tokens for staking, swapping, and liquidity provision
+
+Note: The owner account will mint tokens to your address.
+        `
+        
+        console.log(instructions)
+        toast.success('Check console for token minting instructions')
+        
+        // Copy instructions to clipboard if possible
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(`npx hardhat run scripts/mint-all-tokens.js --network coreTestnet ${address} ${amount}`)
+            toast.success('Command copied to clipboard!')
+          } catch (err) {
+            console.log('Could not copy to clipboard')
+          }
+        }
+        
+        // Add a note about refreshing balances after minting
+        toast.success('After running the command, click "Refresh Balances" to see your new tokens!')
+      }
+      
     } catch (error) {
-      console.error('Mint error:', error)
+      console.error('❌ Token minting failed:', error)
       toast.error('Failed to mint tokens')
     } finally {
       setIsLoading(false)
@@ -1585,18 +1715,27 @@ export const useCoreYield = () => {
       console.log('🔍 Debug: asset:', asset)
       console.log('🔍 Debug: asset type:', typeof asset)
       
-      const market = CONTRACTS.MARKETS[asset as keyof typeof CONTRACTS.MARKETS]
+      // Handle both asset names (stCORE) and market keys (stCORE_0)
+      let marketKey = asset
+      if (asset === 'stCORE') {
+        marketKey = 'stCORE_0' // Default to first stCORE market
+      } else if (asset === 'lstBTC') {
+        marketKey = 'lstBTC_0' // Default to first lstBTC market
+      }
+      
+      const market = CONTRACTS.MARKETS[marketKey as keyof typeof CONTRACTS.MARKETS]
+      console.log('🔍 Debug: marketKey:', marketKey)
       console.log('🔍 Debug: market found:', market)
       
       if (!market) {
-        throw new Error(`Market not found for ${asset}`)
+        throw new Error(`Market not found for ${asset} (tried ${marketKey})`)
       }
 
       if (direction === 'pt-to-yt') {
         // Swap PT to YT: Burn PT and mint YT
         console.log(`🔄 Executing real PT to YT swap...`)
         
-        // First, check PT token allowance for the CoreYieldTokenOperations contract
+        // First, check PT token allowance for the AMM contract
         try {
           const ptAllowance = await publicClient.readContract({
             address: market.ptToken as Address,
@@ -1613,14 +1752,19 @@ export const useCoreYield = () => {
               }
             ] as any,
             functionName: 'allowance',
-            args: [address, CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address]
+            args: [address, CONTRACTS.CORE_YIELD_AMM as Address]
           })
           
-          console.log('🔍 Debug: PT allowance:', ptAllowance)
+          console.log('🔍 Debug: PT allowance for AMM:', ptAllowance)
+          console.log('🔍 Debug: Required amount:', parseEther(amount).toString())
+          console.log('🔍 Debug: Allowance check:', (ptAllowance as bigint) < parseEther(amount))
           
           // If allowance is insufficient, approve first
           if ((ptAllowance as bigint) < parseEther(amount)) {
-            console.log('🔐 Approving PT tokens for CoreYieldTokenOperations...')
+            console.log('🔐 Approving PT tokens for AMM...')
+            
+            // Approve a large amount to avoid repeated approvals
+            const approveAmount = parseEther('1000000') // Approve 1M tokens
             
             const { request: approveRequest } = await publicClient.simulateContract({
               address: market.ptToken as Address,
@@ -1637,7 +1781,7 @@ export const useCoreYield = () => {
                 }
               ] as any,
               functionName: 'approve',
-              args: [CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address, parseEther(amount)]
+              args: [CONTRACTS.CORE_YIELD_AMM as Address, approveAmount]
             })
             
             const approveHash = await walletClient.writeContract(approveRequest)
@@ -1646,6 +1790,8 @@ export const useCoreYield = () => {
             // Wait for approval confirmation
             await publicClient.waitForTransactionReceipt({ hash: approveHash })
             console.log('✅ PT approval confirmed')
+          } else {
+            console.log('✅ PT allowance sufficient, no approval needed')
           }
         } catch (error) {
           console.log('⚠️ Warning: Could not check/approve PT tokens, trying direct swap...')
@@ -1663,63 +1809,139 @@ export const useCoreYield = () => {
           console.log('🔍 Debug: YT Token Address:', market.ytToken)
           console.log('🔍 Debug: Amount:', amount)
           
-          // First, let's try to check if there's any liquidity available
+          // Check AMM pool liquidity and calculate realistic output
+          let poolData: any = null
           try {
-            console.log('🔍 Debug: Checking AMM liquidity...')
-            const liquidityCheck = await publicClient.readContract({
+            console.log('🔍 Debug: Checking AMM pool...')
+            const poolKey = await publicClient.readContract({
               address: CONTRACTS.CORE_YIELD_AMM as Address,
               abi: [
                 {
-                  name: 'yieldInfo',
+                  name: 'getPoolKey',
                   type: 'function',
                   stateMutability: 'view',
-                  inputs: [{ name: '', type: 'address' }],
+                  inputs: [
+                    { name: 'token0', type: 'address' },
+                    { name: 'token1', type: 'address' }
+                  ],
+                  outputs: [{ name: '', type: 'bytes32' }]
+                }
+              ] as any,
+              functionName: 'getPoolKey',
+              args: [market.ptToken as Address, market.ytToken as Address]
+            })
+            
+            poolData = await publicClient.readContract({
+              address: CONTRACTS.CORE_YIELD_AMM as Address,
+              abi: [
+                {
+                  name: 'getPool',
+                  type: 'function',
+                  stateMutability: 'view',
+                  inputs: [{ name: 'poolKey', type: 'bytes32' }],
                   outputs: [
-                    { name: 'currentAPY', type: 'uint256' },
-                    { name: 'historicalAPY', type: 'uint256' },
-                    { name: 'yieldAccrued', type: 'uint256' },
-                    { name: 'lastUpdateTime', type: 'uint256' },
-                    { name: 'isStable', type: 'bool' },
-                    { name: 'yieldVolatility', type: 'uint256' },
-                    { name: 'marketEfficiency', type: 'uint256' }
+                    {
+                      name: '',
+                      type: 'tuple',
+                      components: [
+                        { name: 'token0', type: 'address' },
+                        { name: 'token1', type: 'address' },
+                        { name: 'reserve0', type: 'uint256' },
+                        { name: 'reserve1', type: 'uint256' },
+                        { name: 'totalSupply', type: 'uint256' },
+                        { name: 'isActive', type: 'bool' },
+                        { name: 'tradingFee', type: 'uint256' }
+                      ]
+                    }
                   ]
                 }
               ] as any,
-              functionName: 'yieldInfo',
-              args: [market.syToken as Address]
+              functionName: 'getPool',
+              args: [poolKey]
             })
-            console.log('🔍 Debug: AMM yield info:', liquidityCheck)
-          } catch (liquidityError) {
-            console.log('⚠️ Warning: Could not check AMM liquidity:', liquidityError)
+            
+            console.log('🔍 Debug: Pool data:', poolData)
+            console.log('🔍 Debug: Pool active:', poolData.isActive)
+            console.log('🔍 Debug: Reserve0 (YT):', formatUnits(poolData.reserve0, 18))
+            console.log('🔍 Debug: Reserve1 (PT):', formatUnits(poolData.reserve1, 18))
+            
+            if (!poolData.isActive) {
+              throw new Error('Pool is not active')
+            }
+            
+            if (poolData.reserve0 === 0n || poolData.reserve1 === 0n) {
+              throw new Error('Pool has no liquidity')
+            }
+            
+          } catch (poolError) {
+            console.log('⚠️ Warning: Could not check AMM pool:', poolError)
+            throw new Error(`Cannot check pool liquidity: ${poolError}`)
           }
           
-          // For now, we'll use a simple 1:1 ratio with 5% slippage tolerance
-          // In a real implementation, you'd want to calculate this based on liquidity pools
-          const estimatedOutput = parseEther(amount)
-          const minAmountOut = estimatedOutput * 95n / 100n // 5% slippage tolerance
+          // Calculate expected output using actual pool reserves
+          let estimatedOutput: bigint
+          try {
+            console.log('🔍 Debug: Calculating output using pool reserves')
+            
+            const amountIn = parseEther(amount)
+            
+            // Determine which token is which in the pool
+            const isPTToken0 = poolData.token0.toLowerCase() === market.ptToken.toLowerCase()
+            const reserveIn = isPTToken0 ? poolData.reserve0 : poolData.reserve1
+            const reserveOut = isPTToken0 ? poolData.reserve1 : poolData.reserve0
+            
+            console.log('🔍 Debug: Pool mapping:', {
+              isPTToken0,
+              reserveIn: formatUnits(reserveIn, 18),
+              reserveOut: formatUnits(reserveOut, 18),
+              amountIn: formatUnits(amountIn, 18)
+            })
+            
+            // Check if swap amount is too large (max 10% of reserve)
+            const maxSwapAmount = reserveIn * 10n / 100n
+            if (amountIn > maxSwapAmount) {
+              const maxAmount = formatUnits(maxSwapAmount, 18)
+              throw new Error(`Swap amount too large. Maximum: ${maxAmount} tokens (10% of pool liquidity)`)
+            }
+            
+            // Simple AMM calculation: amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
+            const numerator = amountIn * reserveOut
+            const denominator = reserveIn + amountIn
+            estimatedOutput = numerator / denominator
+            
+            console.log('🔍 Debug: AMM calculation:', {
+              amountIn: formatUnits(amountIn, 18),
+              reserveIn: formatUnits(reserveIn, 18),
+              reserveOut: formatUnits(reserveOut, 18),
+              estimatedOutput: formatUnits(estimatedOutput, 18)
+            })
+            
+            // Check if output is reasonable (at least 1% of input)
+            if (estimatedOutput < amountIn / 100n) {
+              throw new Error('Insufficient liquidity for this swap amount')
+            }
+            
+          } catch (calcError) {
+            console.log('⚠️ Warning: Could not calculate AMM output:', calcError)
+            throw new Error(`Cannot calculate swap output: ${calcError}`)
+          }
+          
+          const minAmountOut = estimatedOutput * 80n / 100n // 20% slippage tolerance for safety
           
           console.log('🔍 Debug: Estimated output:', formatUnits(estimatedOutput, 18))
           console.log('🔍 Debug: Min amount out (with 5% slippage):', formatUnits(minAmountOut, 18))
           
           // Execute the swap using the generic swap function
           console.log('🔍 Debug: Executing PT to YT swap...')
-          const { request: swapRequest } = await publicClient.simulateContract({
+          console.log('🔍 Debug: PT Token (input):', market.ptToken)
+          console.log('🔍 Debug: YT Token (output):', market.ytToken)
+          
+          console.log('🔍 Debug: ABI length:', CoreYieldAMMABI.abi.length)
+          console.log('🔍 Debug: Swap function in ABI:', CoreYieldAMMABI.abi.find(f => f.name === 'swap'))
+          
+          const swapHash = await walletClient.writeContract({
             address: CONTRACTS.CORE_YIELD_AMM as Address,
-            abi: [
-              {
-                name: 'swap',
-                type: 'function',
-                stateMutability: 'nonpayable',
-                inputs: [
-                  { name: '_tokenIn', type: 'address' },
-                  { name: '_tokenOut', type: 'address' },
-                  { name: '_amountIn', type: 'uint256' },
-                  { name: '_minAmountOut', type: 'uint256' },
-                  { name: '_recipient', type: 'address' }
-                ],
-                outputs: [{ name: 'amountOut', type: 'uint256' }]
-              }
-            ] as any,
+            abi: CoreYieldAMMABI.abi,
             functionName: 'swap',
             args: [
               market.ptToken as Address,  // PT token as input
@@ -1729,8 +1951,6 @@ export const useCoreYield = () => {
               address                     // recipient (user)
             ]
           })
-          
-          const swapHash = await walletClient.writeContract(swapRequest)
           console.log('🔄 PT to YT swap transaction hash:', swapHash)
           
           // Wait for swap confirmation
@@ -1753,7 +1973,7 @@ export const useCoreYield = () => {
         // Swap YT to PT: Burn YT and mint PT
         console.log(`🔄 Executing real YT to PT swap...`)
         
-        // First, check YT token allowance for the CoreYieldTokenOperations contract
+        // First, check YT token allowance for the AMM contract
         try {
           const ytAllowance = await publicClient.readContract({
             address: market.ytToken as Address,
@@ -1770,14 +1990,19 @@ export const useCoreYield = () => {
               }
             ] as any,
             functionName: 'allowance',
-            args: [address, CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address]
-        })
+            args: [address, CONTRACTS.CORE_YIELD_AMM as Address]
+          })
         
         console.log('🔍 Debug: YT allowance:', ytAllowance)
+        console.log('🔍 Debug: Required amount:', parseEther(amount).toString())
+        console.log('🔍 Debug: Allowance check:', (ytAllowance as bigint) < parseEther(amount))
         
         // If allowance is insufficient, approve first
         if ((ytAllowance as bigint) < parseEther(amount)) {
-          console.log('🔐 Approving YT tokens for CoreYieldTokenOperations...')
+          console.log('🔐 Approving YT tokens for AMM...')
+          
+          // Approve a large amount to avoid repeated approvals
+          const approveAmount = parseEther('1000000') // Approve 1M tokens
           
           const { request: approveRequest } = await publicClient.simulateContract({
             address: market.ytToken as Address,
@@ -1794,7 +2019,7 @@ export const useCoreYield = () => {
               }
             ] as any,
             functionName: 'approve',
-            args: [CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address, parseEther(amount)]
+            args: [CONTRACTS.CORE_YIELD_AMM as Address, approveAmount]
           })
           
           const approveHash = await walletClient.writeContract(approveRequest)
@@ -1803,6 +2028,8 @@ export const useCoreYield = () => {
           // Wait for approval confirmation
           await publicClient.waitForTransactionReceipt({ hash: approveHash })
           console.log('✅ YT approval confirmed')
+        } else {
+          console.log('✅ YT allowance sufficient, no approval needed')
         }
         } catch (error) {
           console.log('⚠️ Warning: Could not check/approve YT tokens, trying direct swap...')
@@ -1820,33 +2047,125 @@ export const useCoreYield = () => {
           console.log('🔍 Debug: PT Token Address:', market.ptToken)
           console.log('🔍 Debug: Amount:', amount)
           
-          // For now, we'll use a simple 1:1 ratio with 5% slippage tolerance
-          // In a real implementation, you'd want to calculate this based on liquidity pools
-          const estimatedOutput = parseEther(amount)
-          const minAmountOut = estimatedOutput * 95n / 100n // 5% slippage tolerance
+          // Get pool data for YT to PT swap
+          let poolData: any = null
+          try {
+            console.log('🔍 Debug: Getting pool data for YT to PT swap...')
+            const poolKey = await publicClient.readContract({
+              address: CONTRACTS.CORE_YIELD_AMM as Address,
+              abi: [
+                {
+                  name: 'getPoolKey',
+                  type: 'function',
+                  stateMutability: 'view',
+                  inputs: [
+                    { name: 'token0', type: 'address' },
+                    { name: 'token1', type: 'address' }
+                  ],
+                  outputs: [{ name: '', type: 'bytes32' }]
+                }
+              ] as any,
+              functionName: 'getPoolKey',
+              args: [market.ytToken as Address, market.ptToken as Address]
+            })
+            
+            poolData = await publicClient.readContract({
+              address: CONTRACTS.CORE_YIELD_AMM as Address,
+              abi: [
+                {
+                  name: 'getPool',
+                  type: 'function',
+                  stateMutability: 'view',
+                  inputs: [{ name: 'poolKey', type: 'bytes32' }],
+                  outputs: [
+                    {
+                      name: '',
+                      type: 'tuple',
+                      components: [
+                        { name: 'token0', type: 'address' },
+                        { name: 'token1', type: 'address' },
+                        { name: 'reserve0', type: 'uint256' },
+                        { name: 'reserve1', type: 'uint256' },
+                        { name: 'totalSupply', type: 'uint256' },
+                        { name: 'isActive', type: 'bool' },
+                        { name: 'tradingFee', type: 'uint256' }
+                      ]
+                    }
+                  ]
+                }
+              ] as any,
+              functionName: 'getPool',
+              args: [poolKey]
+            })
+            
+            console.log('🔍 Debug: YT to PT Pool data:', poolData)
+            
+          } catch (poolError) {
+            console.log('⚠️ Warning: Could not get pool data for YT to PT:', poolError)
+            throw new Error(`Cannot check pool liquidity: ${poolError}`)
+          }
+          
+          // Calculate expected output using actual pool reserves
+          let estimatedOutput: bigint
+          try {
+            console.log('🔍 Debug: Calculating YT to PT output using pool reserves')
+            
+            const amountIn = parseEther(amount)
+            
+            // Determine which token is which in the pool
+            const isYTToken0 = poolData.token0.toLowerCase() === market.ytToken.toLowerCase()
+            const reserveIn = isYTToken0 ? poolData.reserve0 : poolData.reserve1
+            const reserveOut = isYTToken0 ? poolData.reserve1 : poolData.reserve0
+            
+            console.log('🔍 Debug: YT to PT pool mapping:', {
+              isYTToken0,
+              reserveIn: formatUnits(reserveIn, 18),
+              reserveOut: formatUnits(reserveOut, 18),
+              amountIn: formatUnits(amountIn, 18)
+            })
+            
+            // Check if swap amount is too large (max 10% of reserve)
+            const maxSwapAmount = reserveIn * 10n / 100n
+            if (amountIn > maxSwapAmount) {
+              const maxAmount = formatUnits(maxSwapAmount, 18)
+              throw new Error(`Swap amount too large. Maximum: ${maxAmount} tokens (10% of pool liquidity)`)
+            }
+            
+            // Simple AMM calculation: amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
+            const numerator = amountIn * reserveOut
+            const denominator = reserveIn + amountIn
+            estimatedOutput = numerator / denominator
+            
+            console.log('🔍 Debug: YT to PT AMM calculation:', {
+              amountIn: formatUnits(amountIn, 18),
+              reserveIn: formatUnits(reserveIn, 18),
+              reserveOut: formatUnits(reserveOut, 18),
+              estimatedOutput: formatUnits(estimatedOutput, 18)
+            })
+            
+            // Check if output is reasonable (at least 1% of input)
+            if (estimatedOutput < amountIn / 100n) {
+              throw new Error('Insufficient liquidity for this swap amount')
+            }
+            
+          } catch (calcError) {
+            console.log('⚠️ Warning: Could not calculate YT to PT output:', calcError)
+            throw new Error(`Cannot calculate swap output: ${calcError}`)
+          }
+          
+          const minAmountOut = estimatedOutput * 80n / 100n // 20% slippage tolerance for safety
           
           console.log('🔍 Debug: Estimated output:', formatUnits(estimatedOutput, 18))
           console.log('🔍 Debug: Min amount out (with 5% slippage):', formatUnits(minAmountOut, 18))
           
           // Execute the swap using the generic swap function
           console.log('🔍 Debug: Executing YT to PT swap...')
-          const { request: swapRequest } = await publicClient.simulateContract({
+          console.log('🔍 Debug: ABI length:', CoreYieldAMMABI.abi.length)
+          console.log('🔍 Debug: Swap function in ABI:', CoreYieldAMMABI.abi.find(f => f.name === 'swap'))
+          
+          const swapHash = await walletClient.writeContract({
             address: CONTRACTS.CORE_YIELD_AMM as Address,
-            abi: [
-              {
-                name: 'swap',
-                type: 'function',
-                stateMutability: 'nonpayable',
-                inputs: [
-                  { name: '_tokenIn', type: 'address' },
-                  { name: '_tokenOut', type: 'address' },
-                  { name: '_amountIn', type: 'uint256' },
-                  { name: '_minAmountOut', type: 'uint256' },
-                  { name: '_recipient', type: 'address' }
-                ],
-                outputs: [{ name: 'amountOut', type: 'uint256' }]
-              }
-            ] as any,
+            abi: CoreYieldAMMABI.abi,
             functionName: 'swap',
             args: [
               market.ytToken as Address,  // YT token as input
@@ -1856,8 +2175,6 @@ export const useCoreYield = () => {
               address                     // recipient (user)
             ]
           })
-          
-          const swapHash = await walletClient.writeContract(swapRequest)
           console.log('🔄 YT to PT swap transaction hash:', swapHash)
           
           // Wait for swap confirmation
@@ -1873,8 +2190,92 @@ export const useCoreYield = () => {
       
       setTransactionStatuses(prev => ({ ...prev, swap: 'success' }))
       
-      // Refresh balances
-      await refreshBalances()
+      console.log('🔄 Swap successful, refreshing balances...')
+      
+      // Wait a moment for blockchain state to update
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Force refresh of basic token balances first
+      console.log('🔄 Refreshing basic token balances...')
+      try {
+        // Manually read the latest balances from blockchain
+        const [coreBal, stCoreBal, lstBTCBal] = await Promise.all([
+          publicClient.readContract({
+            address: CONTRACTS.MOCK_ASSETS.dualCORE as Address,
+            abi: [
+              {
+                name: 'balanceOf',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'account', type: 'address' }],
+                outputs: [{ name: '', type: 'uint256' }]
+              }
+            ] as any,
+            functionName: 'balanceOf',
+            args: [address]
+          }),
+          publicClient.readContract({
+            address: CONTRACTS.MOCK_ASSETS.stCORE as Address,
+            abi: [
+              {
+                name: 'balanceOf',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'account', type: 'address' }],
+                outputs: [{ name: '', type: 'uint256' }]
+              }
+            ] as any,
+            functionName: 'balanceOf',
+            args: [address]
+          }),
+          publicClient.readContract({
+            address: CONTRACTS.MOCK_ASSETS.lstBTC as Address,
+            abi: [
+              {
+                name: 'balanceOf',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'account', type: 'address' }],
+                outputs: [{ name: '', type: 'uint256' }]
+              }
+            ] as any,
+            functionName: 'balanceOf',
+            args: [address]
+          })
+        ])
+        
+        console.log('🔍 Fresh balances from blockchain:')
+        console.log('  CORE:', formatUnits(coreBal, 18))
+        console.log('  stCORE:', formatUnits(stCoreBal, 18))
+        console.log('  lstBTC:', formatUnits(lstBTCBal, 18))
+        
+        // Update the userBalances with fresh data
+        setUserBalances(prev => ({
+          ...prev,
+          dualCORE: {
+            ...prev.dualCORE,
+            underlying: parseFloat(formatUnits(coreBal, 18)).toFixed(2)
+          },
+          stCORE: {
+            ...prev.stCORE,
+            underlying: parseFloat(formatUnits(stCoreBal, 18)).toFixed(2)
+          },
+          lstBTC: {
+            ...prev.lstBTC,
+            underlying: parseFloat(formatUnits(lstBTCBal, 18)).toFixed(2)
+          }
+        }))
+        
+        console.log('✅ Basic token balances updated')
+      } catch (error) {
+        console.error('❌ Error refreshing basic balances:', error)
+      }
+      
+      // Refresh token balances (SY, PT, YT)
+      await refreshTokenBalances()
+      console.log('✅ refreshTokenBalances completed')
+      
+      console.log('🔄 Final balances after swap:', userBalances)
       
     } catch (error) {
       console.error('❌ PT/YT swap failed:', error)
@@ -2084,20 +2485,25 @@ export const useCoreYield = () => {
 
   // Split SY to PT + YT function
   const splitSY = async (marketKey: string, amount: string) => {
-    if (!address) {
+    if (!address || !publicClient || !walletClient) {
       toast.error('Please connect your wallet')
       return
     }
 
     try {
       setIsLoading(true)
+      setTransactionStatuses(prev => ({ ...prev, split: 'pending' }))
+      
       const market = CONTRACTS.MARKETS[marketKey as keyof typeof CONTRACTS.MARKETS]
       if (!market) {
         throw new Error(`Market ${marketKey} not found`)
       }
       
+      console.log('🔄 Starting SY split process...')
+      
       // First approve token operations to spend SY
-      await writeStaking({
+      console.log('📝 Step 1: Approving SY token for split...')
+      const approveHash = await walletClient.writeContract({
         address: market.syToken as Address,
         abi: [
           {
@@ -2114,9 +2520,14 @@ export const useCoreYield = () => {
         functionName: 'approve',
         args: [CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS, parseEther(amount)]
       })
-
+      
+      console.log('⏳ Waiting for approval transaction to be confirmed...')
+      await publicClient.waitForTransactionReceipt({ hash: approveHash })
+      console.log('✅ Approval transaction confirmed!')
+      
       // Then split
-      await writeStaking({
+      console.log('🔄 Step 2: Splitting SY to PT + YT...')
+      const splitHash = await walletClient.writeContract({
         address: CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address,
         abi: [
           {
@@ -2133,12 +2544,22 @@ export const useCoreYield = () => {
         functionName: 'splitSY',
         args: [market.syToken, parseEther(amount)]
       })
+      
+      console.log('⏳ Waiting for split transaction to be confirmed...')
+      await publicClient.waitForTransactionReceipt({ hash: splitHash })
+      console.log('✅ Split transaction confirmed!')
 
       toast.success(`Successfully split ${amount} SY to PT + YT`)
-      refreshAll()
+      setTransactionStatuses(prev => ({ ...prev, split: 'success' }))
+      
+      // Refresh all balances including underlying tokens
+      await refreshBalances()
+      await refreshTokenBalances()
+      await refreshAll()
     } catch (error) {
-      console.error('Split error:', error)
+      console.error('❌ Split error:', error)
       toast.error('Failed to split SY tokens')
+      setTransactionStatuses(prev => ({ ...prev, split: 'failed' }))
     } finally {
       setIsLoading(false)
     }
@@ -2146,20 +2567,25 @@ export const useCoreYield = () => {
 
   // Merge PT + YT back to SY function
   const mergePTYT = async (marketKey: string, ptAmount: string, ytAmount: string) => {
-    if (!address) {
+    if (!address || !publicClient || !walletClient) {
       toast.error('Please connect your wallet')
       return
     }
 
     try {
       setIsLoading(true)
+      setTransactionStatuses(prev => ({ ...prev, merge: 'pending' }))
+      
       const market = CONTRACTS.MARKETS[marketKey as keyof typeof CONTRACTS.MARKETS]
       if (!market) {
         throw new Error(`Market ${marketKey} not found`)
       }
       
-      // Approve token operations to spend PT and YT
-      await writeStaking({
+      console.log('🔄 Starting PT + YT merge process...')
+      
+      // Approve token operations to spend PT
+      console.log('📝 Step 1: Approving PT token for merge...')
+      const ptApproveHash = await walletClient.writeContract({
         address: market.ptToken as Address,
         abi: [
           {
@@ -2176,8 +2602,14 @@ export const useCoreYield = () => {
         functionName: 'approve',
         args: [CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS, parseEther(ptAmount)]
       })
+      
+      console.log('⏳ Waiting for PT approval transaction to be confirmed...')
+      await publicClient.waitForTransactionReceipt({ hash: ptApproveHash })
+      console.log('✅ PT approval transaction confirmed!')
 
-      await writeStaking({
+      // Approve token operations to spend YT
+      console.log('📝 Step 2: Approving YT token for merge...')
+      const ytApproveHash = await walletClient.writeContract({
         address: market.ytToken as Address,
         abi: [
           {
@@ -2194,9 +2626,14 @@ export const useCoreYield = () => {
         functionName: 'approve',
         args: [CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS, parseEther(ytAmount)]
       })
+      
+      console.log('⏳ Waiting for YT approval transaction to be confirmed...')
+      await publicClient.waitForTransactionReceipt({ hash: ytApproveHash })
+      console.log('✅ YT approval transaction confirmed!')
 
       // Then merge
-      await writeStaking({
+      console.log('🔄 Step 3: Merging PT + YT to SY...')
+      const mergeHash = await walletClient.writeContract({
         address: CONTRACTS.CORE_YIELD_TOKEN_OPERATIONS as Address,
         abi: [
           {
@@ -2214,12 +2651,22 @@ export const useCoreYield = () => {
         functionName: 'mergePTYT',
         args: [market.syToken, parseEther(ptAmount), parseEther(ytAmount)]
       })
+      
+      console.log('⏳ Waiting for merge transaction to be confirmed...')
+      await publicClient.waitForTransactionReceipt({ hash: mergeHash })
+      console.log('✅ Merge transaction confirmed!')
 
       toast.success(`Successfully merged PT + YT back to SY`)
-      refreshAll()
+      setTransactionStatuses(prev => ({ ...prev, merge: 'success' }))
+      
+      // Refresh all balances including underlying tokens
+      await refreshBalances()
+      await refreshTokenBalances()
+      await refreshAll()
     } catch (error) {
-      console.error('Merge error:', error)
+      console.error('❌ Merge error:', error)
       toast.error('Failed to merge PT + YT tokens')
+      setTransactionStatuses(prev => ({ ...prev, merge: 'failed' }))
     } finally {
       setIsLoading(false)
     }
@@ -2945,6 +3392,136 @@ export const useCoreYield = () => {
     }
   }, [address, publicClient])
 
+  // Request tokens for testing (calls backend script)
+  const requestTestTokens = async (amount: string = '10000') => {
+    if (!address) {
+      toast.error('Please connect your wallet')
+      return
+    }
+
+    try {
+      console.log(`🪙 Requesting ${amount} test tokens for ${address}...`)
+      
+      // In a real implementation, this would call a backend API
+      // For now, we'll show instructions to the user
+      const instructions = `
+🪙 TOKEN REQUEST INSTRUCTIONS
+
+To get test tokens, run this command in your terminal:
+
+npx hardhat run scripts/mint-all-tokens.js --network coreTestnet ${address} ${amount}
+
+This will mint ${amount} CORE tokens to your address: ${address}
+
+After running the command:
+1. Refresh this page
+2. Your balances should update automatically
+3. You can now use the tokens for staking, swapping, and liquidity provision
+
+Note: The owner account will mint tokens to your address.
+      `
+      
+      console.log(instructions)
+      toast.success('Check console for token request instructions')
+      
+      // Copy instructions to clipboard if possible
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(`npx hardhat run scripts/mint-all-tokens.js --network coreTestnet ${address} ${amount}`)
+          toast.success('Command copied to clipboard!')
+        } catch (err) {
+          console.log('Could not copy to clipboard')
+        }
+      }
+      
+      // Add a note about refreshing balances after minting
+      toast.success('After running the command, click "Refresh Balances" to see your new tokens!')
+      
+    } catch (error) {
+      console.error('❌ Token request failed:', error)
+      toast.error('Failed to request tokens')
+    }
+  }
+
+  // Get real pool data from blockchain
+  const getRealPoolData = async (asset: string) => {
+    if (!publicClient) return null
+
+    try {
+      const market = CONTRACTS.MARKETS[asset as keyof typeof CONTRACTS.MARKETS]
+      if (!market) return null
+
+      // Get pool key
+      const poolKey = await publicClient.readContract({
+        address: CONTRACTS.CORE_YIELD_AMM as Address,
+        abi: [
+          {
+            name: 'getPoolKey',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [
+              { name: 'token0', type: 'address' },
+              { name: 'token1', type: 'address' }
+            ],
+            outputs: [{ name: '', type: 'bytes32' }]
+          }
+        ] as any,
+        functionName: 'getPoolKey',
+        args: [market.ptToken as Address, market.ytToken as Address]
+      })
+
+      // Get pool data
+      const pool = await publicClient.readContract({
+        address: CONTRACTS.CORE_YIELD_AMM as Address,
+        abi: [
+          {
+            name: 'getPool',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'poolKey', type: 'bytes32' }],
+            outputs: [
+              {
+                name: '',
+                type: 'tuple',
+                components: [
+                  { name: 'token0', type: 'address' },
+                  { name: 'token1', type: 'address' },
+                  { name: 'reserve0', type: 'uint256' },
+                  { name: 'reserve1', type: 'uint256' },
+                  { name: 'totalSupply', type: 'uint256' },
+                  { name: 'isActive', type: 'bool' },
+                  { name: 'tradingFee', type: 'uint256' }
+                ]
+              }
+            ]
+          }
+        ] as any,
+        functionName: 'getPool',
+        args: [poolKey]
+      })
+
+      // Determine which token is which
+      const isPTToken0 = pool.token0.toLowerCase() === market.ptToken.toLowerCase()
+      const ptReserve = isPTToken0 ? pool.reserve0 : pool.reserve1
+      const ytReserve = isPTToken0 ? pool.reserve1 : pool.reserve0
+
+      return {
+        poolKey,
+        token0: pool.token0,
+        token1: pool.token1,
+        ptReserve: formatUnits(ptReserve, 18),
+        ytReserve: formatUnits(ytReserve, 18),
+        totalSupply: formatUnits(pool.totalSupply, 18),
+        isActive: pool.isActive,
+        tradingFee: pool.tradingFee.toString(),
+        totalLiquidity: parseFloat(formatUnits(ptReserve, 18)) + parseFloat(formatUnits(ytReserve, 18))
+      }
+    } catch (error) {
+      console.error('Error fetching pool data:', error)
+      return null
+    }
+  }
+
   // Add liquidity to a pool
   const addLiquidity = async (asset: string, ptAmount: string, ytAmount: string) => {
     if (!address || !publicClient || !walletClient) {
@@ -2956,23 +3533,131 @@ export const useCoreYield = () => {
       console.log('🚀 Adding liquidity to pool:', asset)
       setIsLoading(true)
 
-      // Get pool data
-      const pool = poolData[asset]
-      if (!pool) {
-        toast.error('Pool not found')
+      // Get market data
+      const market = CONTRACTS.MARKETS[asset as keyof typeof CONTRACTS.MARKETS]
+      if (!market) {
+        toast.error(`Market not found for ${asset}`)
         return
       }
 
-      // For now, this is a placeholder implementation
-      // In a real implementation, you would:
-      // 1. Approve PT and YT tokens for the AMM contract
-      // 2. Call addLiquidity on the AMM contract
-      // 3. Handle the LP token minting
+      const ptAmountWei = parseEther(ptAmount)
+      const ytAmountWei = parseEther(ytAmount)
 
-      toast.success(`Liquidity added to ${asset} pool!`)
-      console.log('✅ Liquidity added successfully')
+      console.log('🔍 Debug: Adding liquidity with amounts:', {
+        ptAmount: ptAmount,
+        ytAmount: ytAmount,
+        ptAmountWei: ptAmountWei.toString(),
+        ytAmountWei: ytAmountWei.toString()
+      })
+
+      // Check PT token allowance
+      const ptAllowance = await publicClient.readContract({
+        address: market.ptToken as Address,
+        abi: [
+          {
+            name: 'allowance',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [
+              { name: 'owner', type: 'address' },
+              { name: 'spender', type: 'address' }
+            ],
+            outputs: [{ name: '', type: 'uint256' }]
+          }
+        ] as any,
+        functionName: 'allowance',
+        args: [address, CONTRACTS.CORE_YIELD_AMM as Address]
+      })
+
+      if (ptAllowance < ptAmountWei) {
+        console.log('🔄 Approving PT tokens...')
+        const ptApproveHash = await walletClient.writeContract({
+          address: market.ptToken as Address,
+          abi: [
+            {
+              name: 'approve',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'spender', type: 'address' },
+                { name: 'amount', type: 'uint256' }
+              ],
+              outputs: [{ name: '', type: 'bool' }]
+            }
+          ] as any,
+          functionName: 'approve',
+          args: [CONTRACTS.CORE_YIELD_AMM as Address, ptAmountWei]
+        })
+        await publicClient.waitForTransactionReceipt({ hash: ptApproveHash })
+        console.log('✅ PT tokens approved')
+      }
+
+      // Check YT token allowance
+      const ytAllowance = await publicClient.readContract({
+        address: market.ytToken as Address,
+        abi: [
+          {
+            name: 'allowance',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [
+              { name: 'owner', type: 'address' },
+              { name: 'spender', type: 'address' }
+            ],
+            outputs: [{ name: '', type: 'uint256' }]
+          }
+        ] as any,
+        functionName: 'allowance',
+        args: [address, CONTRACTS.CORE_YIELD_AMM as Address]
+      })
+
+      if (ytAllowance < ytAmountWei) {
+        console.log('🔄 Approving YT tokens...')
+        const ytApproveHash = await walletClient.writeContract({
+          address: market.ytToken as Address,
+          abi: [
+            {
+              name: 'approve',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'spender', type: 'address' },
+                { name: 'amount', type: 'uint256' }
+              ],
+              outputs: [{ name: '', type: 'bool' }]
+            }
+          ] as any,
+          functionName: 'approve',
+          args: [CONTRACTS.CORE_YIELD_AMM as Address, ytAmountWei]
+        })
+        await publicClient.waitForTransactionReceipt({ hash: ytApproveHash })
+        console.log('✅ YT tokens approved')
+      }
+
+      // Add liquidity to the pool
+      console.log('🔄 Adding liquidity to AMM pool...')
+      const addLiquidityHash = await walletClient.writeContract({
+        address: CONTRACTS.CORE_YIELD_AMM as Address,
+        abi: CoreYieldAMMABI.abi,
+        functionName: 'addLiquidity',
+        args: [
+          market.ptToken as Address,
+          market.ytToken as Address,
+          ptAmountWei,
+          ytAmountWei,
+          0n // minLiquidity (0 for now)
+        ]
+      })
+
+      console.log('🔄 Add liquidity transaction hash:', addLiquidityHash)
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: addLiquidityHash })
+      console.log('✅ Liquidity added successfully:', receipt)
+
+      toast.success(`Successfully added liquidity to ${asset} pool!`)
       
-      // Refresh pool data
+      // Refresh balances and pool data
+      await refreshBalances()
+      await refreshTokenBalances()
       await loadPoolData()
       
     } catch (error) {
@@ -3053,6 +3738,8 @@ export const useCoreYield = () => {
     transactionStatuses,
     getButtonText,
     getLockPeriodInfo,
-    addLiquidity
+    addLiquidity,
+    getRealPoolData,
+    requestTestTokens
   }
 }

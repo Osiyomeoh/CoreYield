@@ -46,7 +46,9 @@ const PoolsTab: React.FC = () => {
     enableAutoCompound,
     getPortfolioAnalytics,
     addLiquidity,
-    isLoading 
+    isLoading,
+    userBalances,
+    getRealPoolData
   } = useCoreYield()
 
   // For now, use console.error instead of toast since it's not available
@@ -54,6 +56,39 @@ const PoolsTab: React.FC = () => {
     console.error(message)
     // In a real app, you'd use a proper toast system
   }
+
+  // Load real pool data
+  const loadRealPoolData = async () => {
+    setLoadingPoolData(true)
+    try {
+      const poolKeys = ['stCORE_0', 'lstBTC_0'] // Available pools
+      const poolDataPromises = poolKeys.map(async (key) => {
+        const data = await getRealPoolData(key)
+        return { key, data }
+      })
+      
+      const results = await Promise.all(poolDataPromises)
+      const poolDataMap: Record<string, any> = {}
+      
+      results.forEach(({ key, data }) => {
+        if (data) {
+          poolDataMap[key] = data
+        }
+      })
+      
+      setRealPoolData(poolDataMap)
+      console.log('✅ Real pool data loaded:', poolDataMap)
+    } catch (error) {
+      console.error('❌ Error loading pool data:', error)
+    } finally {
+      setLoadingPoolData(false)
+    }
+  }
+
+  // Load pool data on component mount
+  useEffect(() => {
+    loadRealPoolData()
+  }, [])
 
   const [selectedAsset, setSelectedAsset] = useState('stCORE')
   const [strategyType, setStrategyType] = useState(1)
@@ -68,6 +103,10 @@ const PoolsTab: React.FC = () => {
   const [ptAmount, setPtAmount] = useState('')
   const [ytAmount, setYtAmount] = useState('')
   const [showLiquidityModal, setShowLiquidityModal] = useState(false)
+  
+  // Real pool data state
+  const [realPoolData, setRealPoolData] = useState<Record<string, any>>({})
+  const [loadingPoolData, setLoadingPoolData] = useState(false)
   
   // Filtering state
   const [selectedNetworks, setSelectedNetworks] = useState(['core'])
@@ -103,9 +142,29 @@ const PoolsTab: React.FC = () => {
     { id: 'yield', name: 'Yield' }
   ]
 
-  // Filtered pool data
+  // Filtered pool data - use real pool data
   const filteredPoolData = useMemo(() => {
-    let filtered = Object.entries(poolData)
+    // Convert real pool data to the format expected by the UI
+    const realPools = Object.entries(realPoolData).map(([key, pool]) => {
+      const underlying = key.startsWith('stCORE') ? 'stCORE' : 'lstBTC'
+      return [key, {
+        underlying,
+        symbol: key,
+        network: 'core',
+        category: 'yield',
+        isPrime: true,
+        tvl: `$${(pool.totalLiquidity || 0).toFixed(2)}`,
+        apy: '8.5',
+        volume24h: '$0.00',
+        liquidity: pool.totalLiquidity || 0,
+        ptReserve: pool.ptReserve || '0',
+        ytReserve: pool.ytReserve || '0',
+        tradingFee: pool.tradingFee || '30',
+        isActive: pool.isActive || false
+      }]
+    })
+    
+    let filtered = realPools
     
     // Search filter
     if (searchQuery) {
@@ -135,13 +194,13 @@ const PoolsTab: React.FC = () => {
     // Prime filter (show only high TVL pools)
     if (showPrime) {
       filtered = filtered.filter(([key, pool]) => {
-        const tvl = parseFloat(pool.tvl.replace('$', '').replace(',', ''))
-        return tvl > 1000000 // $1M+ TVL
+        const tvl = pool.liquidity || 0
+        return tvl > 1 // Show pools with more than 1 token liquidity
       })
     }
     
     return filtered
-  }, [poolData, searchQuery, selectedNetworks, selectedCategory, showPrime])
+  }, [realPoolData, searchQuery, selectedNetworks, selectedCategory, showPrime])
 
   // Group pools by underlying asset
   const groupedPools = useMemo(() => {
@@ -681,6 +740,182 @@ const PoolsTab: React.FC = () => {
                     }, 0).toLocaleString()}
                   </span>
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Add Liquidity Section */}
+          <div className="bg-gradient-to-br from-green-900/80 to-emerald-800/80 backdrop-blur-xl border border-green-700/50 rounded-3xl p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mr-4">
+                  <span className="text-2xl">➕</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Add Liquidity</h2>
+                  <p className="text-gray-300">Provide liquidity to AMM pools and earn trading fees</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Add Liquidity Form */}
+              <div className="bg-gray-800/50 rounded-2xl border border-gray-700/30 p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Add Liquidity to Pool</h3>
+                
+                <div className="space-y-4">
+                  {/* Pool Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Select Pool</label>
+                    <select
+                      value={selectedPool}
+                      onChange={(e) => setSelectedPool(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Choose a pool...</option>
+                      <option value="stCORE_0">stCORE Pool (PT/YT)</option>
+                      <option value="lstBTC_0">lstBTC Pool (PT/YT)</option>
+                    </select>
+                  </div>
+
+                  {/* PT Amount Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">PT Amount</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={ptAmount}
+                        onChange={(e) => setPtAmount(e.target.value)}
+                        placeholder="0.0"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent pr-16"
+                      />
+                      <button
+                        onClick={() => {
+                          if (selectedPool && userBalances[selectedPool]) {
+                            setPtAmount(userBalances[selectedPool].formatted)
+                          }
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Balance: {selectedPool && userBalances[selectedPool] ? userBalances[selectedPool].formatted : '0.00'} PT
+                    </p>
+                  </div>
+
+                  {/* YT Amount Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">YT Amount</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={ytAmount}
+                        onChange={(e) => setYtAmount(e.target.value)}
+                        placeholder="0.0"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent pr-16"
+                      />
+                      <button
+                        onClick={() => {
+                          if (selectedPool && userBalances[selectedPool]) {
+                            setYtAmount(userBalances[selectedPool].formatted)
+                          }
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Balance: {selectedPool && userBalances[selectedPool] ? userBalances[selectedPool].formatted : '0.00'} YT
+                    </p>
+                  </div>
+
+                  {/* Add Liquidity Button */}
+                  <button
+                    onClick={async () => {
+                      if (!selectedPool || !ptAmount || !ytAmount) {
+                        showError('Please fill in all fields')
+                        return
+                      }
+                      try {
+                        await addLiquidity(selectedPool, ptAmount, ytAmount)
+                        // Refresh pool data after successful liquidity addition
+                        await loadRealPoolData()
+                        // Clear form
+                        setPtAmount('')
+                        setYtAmount('')
+                      } catch (error) {
+                        console.error('Add liquidity failed:', error)
+                      }
+                    }}
+                    disabled={!selectedPool || !ptAmount || !ytAmount || isLoading}
+                    className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Adding Liquidity...' : 'Add Liquidity'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pool Information */}
+              <div className="bg-gray-800/50 rounded-2xl border border-gray-700/30 p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Pool Information</h3>
+                
+                {selectedPool ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">Pool</span>
+                      <span className="text-white font-medium">{selectedPool}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">PT Reserve</span>
+                      <span className="text-white font-medium">
+                        {realPoolData[selectedPool]?.ptReserve || 'Loading...'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">YT Reserve</span>
+                      <span className="text-white font-medium">
+                        {realPoolData[selectedPool]?.ytReserve || 'Loading...'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">Total Liquidity</span>
+                      <span className="text-white font-medium">
+                        {realPoolData[selectedPool]?.totalLiquidity?.toFixed(2) || 'Loading...'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                      <span className="text-gray-300">Trading Fee</span>
+                      <span className="text-white font-medium">
+                        {realPoolData[selectedPool]?.tradingFee ? 
+                          `${(parseInt(realPoolData[selectedPool].tradingFee) / 100).toFixed(2)}%` : 
+                          'Loading...'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-300">Pool Status</span>
+                      <span className={`font-medium ${realPoolData[selectedPool]?.isActive ? 'text-green-400' : 'text-red-400'}`}>
+                        {realPoolData[selectedPool]?.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-6 p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
+                      <p className="text-green-300 text-sm">
+                        💡 <strong>Tip:</strong> Adding liquidity helps improve swap rates and you earn trading fees from all swaps in this pool.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl text-gray-400">💧</span>
+                    </div>
+                    <p className="text-gray-400">Select a pool to view information</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

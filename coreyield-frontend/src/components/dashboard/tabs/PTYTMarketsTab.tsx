@@ -14,7 +14,8 @@ export const PTYTMarketsTab: React.FC = () => {
     splitSY,
     mergePTYT,
     unwrapFromSY,
-    refreshBalances
+    refreshBalances,
+    swapPTYT
   } = useCoreYield()
 
   const [selectedMarket, setSelectedMarket] = useState<string>('lstBTC_0')
@@ -83,10 +84,32 @@ export const PTYTMarketsTab: React.FC = () => {
 
   const handleSwap = async () => {
     if (!swapAmount || parseFloat(swapAmount) <= 0 || !selectedMarketData) return
-    // TODO: Implement swap functionality
-    console.log('Swap functionality coming soon!')
-    setSwapAmount('')
-    refreshBalances()
+    
+    try {
+      console.log('🔄 Starting PT/YT swap...', {
+        market: selectedMarket,
+        asset: selectedAsset,
+        amount: swapAmount,
+        direction: swapDirection
+      })
+      
+      // Convert the direction format to match the hook's expected format
+      const direction = swapDirection === 'PT_TO_YT' ? 'pt-to-yt' : 'yt-to-pt'
+      
+      // Use selectedAsset instead of selectedMarket for swapPTYT
+      await swapPTYT(selectedAsset, swapAmount, direction)
+      
+      // Reset form
+      setSwapAmount('')
+      
+      // Refresh balances to show updated amounts
+      await refreshBalances()
+      
+      console.log('✅ PT/YT swap completed successfully!')
+    } catch (error) {
+      console.error('❌ PT/YT swap failed:', error)
+      // Error handling is done in the hook, so we just log here
+    }
   }
 
   const getMarketModeColor = (mode: string) => {
